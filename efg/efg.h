@@ -84,6 +84,7 @@ private:
     void LoadAssets();
     void PopulateCommandList();
     void WaitForPreviousFrame();
+    void CreateGraphicsPipelineState();
 };
 
 struct Vertex

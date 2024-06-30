@@ -17,6 +17,32 @@ void efgDestroyWindow(EfgWindow window)
     }
 }
 
+void efgWindowPumpEvents(EfgWindow window)
+{
+    EfgWindowInternal* efgWindow = EfgWindowInternal::GetEfgWindow(window);
+    efgWindow->pumpEvents();
+}
+
+void EfgWindowInternal::pumpEvents()
+{
+    MSG msg = {};
+    if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+    {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+    else
+    {
+        WaitMessage();
+    }
+}
+
+bool efgWindowIsRunning(EfgWindow window)
+{
+    EfgWindowInternal* efgWindow = EfgWindowInternal::GetEfgWindow(window);
+    return efgWindow->active;
+}
+
 void EfgWindowInternal::initialize(EfgWindow& window, uint32_t width, uint32_t height, const wchar_t* windowTitle)
 {
 	    windowTitle = (!windowTitle ? L"Freeside" : windowTitle);
@@ -33,7 +59,7 @@ void EfgWindowInternal::initialize(EfgWindow& window, uint32_t width, uint32_t h
 
         RECT window_rect = { 0, 0, (LONG)width, (LONG)height };
 
-        DWORD const window_style = WS_OVERLAPPEDWINDOW & WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
+        DWORD const window_style = WS_OVERLAPPEDWINDOW;
 
         AdjustWindowRect(&window_rect, window_style, FALSE);
 
@@ -57,13 +83,20 @@ void EfgWindowInternal::initialize(EfgWindow& window, uint32_t width, uint32_t h
         ShowWindow(window_, SW_SHOWDEFAULT);
 
         window.hWnd = window_;
+        active = true;
 }
 
 // Main message handler for the sample.
 LRESULT CALLBACK EfgWindowInternal::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-
-    // Handle any messages the switch statement didn't.
+    EfgWindowInternal* efgWindow = (EfgWindowInternal*)GetWindowLongPtrA(hWnd, GWLP_USERDATA);
+    switch (message)
+    {
+        case WM_DESTROY:
+        {
+            efgWindow->active = false;
+        }
+    }
     return DefWindowProc(hWnd, message, wParam, lParam);
 }
 

@@ -33,6 +33,10 @@ public:
 	EfgInternal(EfgContext& efg) { efg.handle = reinterpret_cast<uint64_t>(this); };
 	void initialize(HWND window);
 	static inline EfgInternal* GetEfg(EfgContext& context);
+    void Update();
+    void Render();
+    void Destroy();
+
 
 private:
     void GetHardwareAdapter(
@@ -65,10 +69,11 @@ private:
     UINT64 m_fenceValue = 0;
 
     void LoadPipeline();
-    //void LoadAssets();
-    //void PopulateCommandList();
-    //void WaitForPreviousFrame();
+    void LoadAssets();
+    void PopulateCommandList();
+    void WaitForPreviousFrame();
 };
 
 EfgContext efgCreateContext(HWND window);
 void efgDestroyContext(EfgContext context);
+void efgUpdate(EfgContext context);

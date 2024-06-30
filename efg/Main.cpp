@@ -19,7 +19,6 @@ int main()
     while (efgWindowIsRunning(efgWindow))
     {
         efgWindowPumpEvents(efgWindow);
-
     }
 
     efgDestroyWindow(efgWindow);

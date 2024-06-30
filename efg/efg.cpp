@@ -20,8 +20,11 @@ void efgDestroyContext(EfgContext context)
 void efgUpdate(EfgContext context)
 {
 	EfgInternal* efg = EfgInternal::GetEfg(context);
-    efg->Update();
-    efg->Render();
+    if (efg)
+    {
+        efg->Update();
+        efg->Render();
+    }
 }
 
 void EfgInternal::initialize(HWND window)

@@ -20,6 +20,34 @@
 using namespace DirectX;
 using Microsoft::WRL::ComPtr;
 
+struct Vertex
+{
+    XMFLOAT3 position;
+    XMFLOAT4 color;
+};
+
+class EfgBuffer
+{
+public:
+    ComPtr<ID3D12Resource> m_vertexBuffer;
+    D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
+private:
+};
+
+struct EfgPSO
+{
+    ComPtr<ID3D12RootSignature> rootSignature;
+    ComPtr<ID3D12PipelineState> pipelineState;
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
+};
+
+struct EfgProgram
+{
+    std::wstring source;
+    ComPtr<ID3DBlob> vs;
+    ComPtr<ID3DBlob> ps;
+};
+
 class EfgContext
 {
 public:
@@ -34,8 +62,13 @@ public:
 	EfgInternal(EfgContext& efg) { efg.handle = reinterpret_cast<uint64_t>(this); };
 	void initialize(HWND window);
 	static inline EfgInternal* GetEfg(EfgContext& context);
-    void CreateBuffer(void const* data, UINT size);
-    void Update();
+    EfgBuffer CreateBuffer(void const* data, UINT size);
+    EfgProgram CreateProgram(LPCWSTR fileName);
+    EfgPSO CreateGraphicsPipelineState(EfgProgram program);
+    void SetPipelineState(EfgPSO pso);
+    void bindVertexBuffer(EfgBuffer buffer);
+    void DrawInstanced(uint32_t vertexCount);
+    void DrawIndexedInstanced(uint32_t indexCount);
     void Render();
     void Destroy();
 
@@ -46,6 +79,8 @@ private:
         _Outptr_result_maybenull_ IDXGIAdapter1** ppAdapter,
         bool requestHighPerformanceAdapter = false
     );
+
+    void CompileProgram(EfgProgram& program);
 
 	HWND window_ = {};
     static const UINT FrameCount = 2;
@@ -63,15 +98,10 @@ private:
     ComPtr<ID3D12Resource> m_renderTargets[FrameCount];
     ComPtr<ID3D12CommandAllocator> m_commandAllocator;
     ComPtr<ID3D12CommandQueue> m_commandQueue;
-    ComPtr<ID3D12RootSignature> m_rootSignature;
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-    ComPtr<ID3D12PipelineState> m_pipelineState;
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
     UINT m_rtvDescriptorSize = 0;
-
-    // App resources.
-    ComPtr<ID3D12Resource> m_vertexBuffer;
-    D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
+    EfgPSO m_boundPSO = {};
 
     // Synchronization objects.
     UINT m_frameIndex = 0;
@@ -79,22 +109,22 @@ private:
     ComPtr<ID3D12Fence> m_fence;
     UINT64 m_fenceValue = 0;
 
+    EfgBuffer m_boundBuffer;
+
     std::wstring GetAssetFullPath(LPCWSTR assetName);
     void LoadPipeline();
     void LoadAssets();
-    void PopulateCommandList();
     void WaitForPreviousFrame();
-    void CreateGraphicsPipelineState();
 };
 
-struct Vertex
-{
-    XMFLOAT3 position;
-    XMFLOAT4 color;
-};
 
 EfgContext efgCreateContext(HWND window);
 void efgDestroyContext(EfgContext context);
-void efgUpdate(EfgContext context);
-
-void efgCreateBuffer(EfgContext context, void const* data, UINT size);
+void efgBindVertexBuffer(EfgContext context, EfgBuffer buffer);
+EfgBuffer efgCreateBuffer(EfgContext context, void const* data, UINT size);
+EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName);
+EfgPSO efgCreateGraphicsPipelineState(EfgContext context, EfgProgram program);
+void efgSetPipelineState(EfgContext efg, EfgPSO pso);
+void efgDrawInstanced(EfgContext efg, uint32_t vertexCount);
+void efgDrawIndexedInstanced(EfgContext efg, uint32_t indexCount);
+void efgRender(EfgContext efg);

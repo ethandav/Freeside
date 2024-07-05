@@ -13,12 +13,17 @@ int main()
         { { -0.25f, -0.25f, 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }
     };
 
-    efgCreateBuffer(efg, triangleVertices, sizeof(triangleVertices));
+    EfgBuffer vertexBuffer = efgCreateBuffer(efg, triangleVertices, sizeof(triangleVertices));
+    EfgProgram program = efgCreateProgram(efg, L"shaders.hlsl");
+    EfgPSO pso = efgCreateGraphicsPipelineState(efg, program);
 
     while (efgWindowIsRunning(efgWindow))
     {
         efgWindowPumpEvents(efgWindow);
-        efgUpdate(efg);
+        efgBindVertexBuffer(efg, vertexBuffer);
+        efgSetPipelineState(efg, pso);
+        efgDrawInstanced(efg, 3);
+        efgRender(efg);
     }
 
     efgDestroyWindow(efgWindow);

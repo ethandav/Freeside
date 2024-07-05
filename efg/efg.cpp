@@ -11,29 +11,55 @@ EfgContext efgCreateContext(HWND window)
 void efgDestroyContext(EfgContext context)
 {
 	EfgInternal* efg = EfgInternal::GetEfg(context);
-	if (efg)
-	{
-		delete efg;
-	}
+	delete efg;
 }
 
-void efgUpdate(EfgContext context)
+void efgRender(EfgContext context)
 {
 	EfgInternal* efg = EfgInternal::GetEfg(context);
-    if (efg)
-    {
-        efg->Update();
-        efg->Render();
-    }
+    efg->Render();
 }
 
-void efgCreateBuffer(EfgContext context, void const* data, UINT size)
+EfgBuffer efgCreateBuffer(EfgContext context, void const* data, UINT size)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
-    if (efg)
-    {
-        efg->CreateBuffer(data, size);
-    }
+    return efg->CreateBuffer(data, size);
+}
+
+EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName)
+{
+    EfgInternal* efg = EfgInternal::GetEfg(context);
+    return efg->CreateProgram(fileName);
+}
+
+EfgPSO efgCreateGraphicsPipelineState(EfgContext context, EfgProgram program)
+{
+    EfgInternal* efg = EfgInternal::GetEfg(context);
+    return efg->CreateGraphicsPipelineState(program);
+}
+
+void efgSetPipelineState(EfgContext context, EfgPSO pso)
+{
+    EfgInternal* efg = EfgInternal::GetEfg(context);
+    efg->SetPipelineState(pso);
+}
+
+void efgBindVertexBuffer(EfgContext context, EfgBuffer buffer)
+{
+    EfgInternal* efg = EfgInternal::GetEfg(context);
+    efg->bindVertexBuffer(buffer);
+}
+
+void efgDrawInstanced(EfgContext context, uint32_t vertexCount)
+{
+    EfgInternal* efg = EfgInternal::GetEfg(context);
+    efg->DrawInstanced(vertexCount);
+}
+
+void efgDrawIndexedInstanced(EfgContext context, uint32_t indexCount)
+{
+    EfgInternal* efg = EfgInternal::GetEfg(context);
+    efg->DrawIndexedInstanced(indexCount);
 }
 
 void EfgInternal::initialize(HWND window)
@@ -246,21 +272,8 @@ void EfgInternal::LoadPipeline()
 // Load the sample assets.
 void EfgInternal::LoadAssets()
 {
-    // Create an empty root signature.
-    {
-        CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-        rootSignatureDesc.Init(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-        ComPtr<ID3DBlob> signature;
-        ComPtr<ID3DBlob> error;
-        ThrowIfFailed(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
-        ThrowIfFailed(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
-    }
-
-    CreateGraphicsPipelineState();
-
     // Create the command list.
-    ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator.Get(), m_pipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
+    ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator.Get(), nullptr, IID_PPV_ARGS(&m_commandList)));
 
     // Command lists are created in the recording state, but there is nothing
     // to record yet. The main loop expects it to be closed, so close it now.
@@ -285,16 +298,12 @@ void EfgInternal::LoadAssets()
     }
 }
 
-// Update frame-based values.
-void EfgInternal::Update()
-{
-}
-
 // Render the scene.
 void EfgInternal::Render()
 {
-    // Record all the commands we need to render the scene into the command list.
-    PopulateCommandList();
+    // Indicate that the back buffer will now be used to present.
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+    ThrowIfFailed(m_commandList->Close());
 
     // Execute the command list.
     ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
@@ -306,16 +315,7 @@ void EfgInternal::Render()
     WaitForPreviousFrame();
 }
 
-void EfgInternal::Destroy()
-{
-    // Ensure that the GPU is no longer referencing resources that are about to be
-    // cleaned up by the destructor.
-    WaitForPreviousFrame();
-
-    CloseHandle(m_fenceEvent);
-}
-
-void EfgInternal::PopulateCommandList()
+void EfgInternal::DrawInstanced(uint32_t vertexCount)
 {
     // Command list allocators can only be reset when the associated 
     // command lists have finished execution on the GPU; apps should use 
@@ -325,10 +325,10 @@ void EfgInternal::PopulateCommandList()
     // However, when ExecuteCommandList() is called on a particular command 
     // list, that command list can then be reset at any time and must be before 
     // re-recording.
-    ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), m_pipelineState.Get()));
+    ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), m_boundPSO.pipelineState.Get()));
 
     // Set necessary state.
-    m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+    m_commandList->SetGraphicsRootSignature(m_boundPSO.rootSignature.Get());
     m_commandList->RSSetViewports(1, &m_viewport);
     m_commandList->RSSetScissorRects(1, &m_scissorRect);
 
@@ -342,13 +342,48 @@ void EfgInternal::PopulateCommandList()
     const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
     m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-    m_commandList->DrawInstanced(3, 1, 0, 0);
+    m_commandList->IASetVertexBuffers(0, 1, &m_boundBuffer.m_vertexBufferView);
+    m_commandList->DrawInstanced(vertexCount, 1, 0, 0);
+}
 
-    // Indicate that the back buffer will now be used to present.
-    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+void EfgInternal::DrawIndexedInstanced(uint32_t indexCount)
+{
+    // Command list allocators can only be reset when the associated 
+    // command lists have finished execution on the GPU; apps should use 
+    // fences to determine GPU execution progress.
+    ThrowIfFailed(m_commandAllocator->Reset());
 
-    ThrowIfFailed(m_commandList->Close());
+    // However, when ExecuteCommandList() is called on a particular command 
+    // list, that command list can then be reset at any time and must be before 
+    // re-recording.
+    ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), m_boundPSO.pipelineState.Get()));
+
+    // Set necessary state.
+    m_commandList->SetGraphicsRootSignature(m_boundPSO.rootSignature.Get());
+    m_commandList->RSSetViewports(1, &m_viewport);
+    m_commandList->RSSetScissorRects(1, &m_scissorRect);
+
+    // Indicate that the back buffer will be used as a render target.
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+    m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+
+    // Record commands.
+    const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+    m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_commandList->IASetVertexBuffers(0, 1, &m_boundBuffer.m_vertexBufferView);
+    m_commandList->DrawIndexedInstanced(indexCount, 1, 0, 0, 0);
+}
+
+void EfgInternal::Destroy()
+{
+    // Ensure that the GPU is no longer referencing resources that are about to be
+    // cleaned up by the destructor.
+    WaitForPreviousFrame();
+
+    CloseHandle(m_fenceEvent);
 }
 
 void EfgInternal::WaitForPreviousFrame()
@@ -373,8 +408,10 @@ void EfgInternal::WaitForPreviousFrame()
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 }
 
-void EfgInternal::CreateBuffer(void const* data, UINT size)
+EfgBuffer EfgInternal::CreateBuffer(void const* data, UINT size)
 {
+    EfgBuffer buffer = { };
+
     // Note: using upload heaps to transfer static data like vert buffers is not 
     // recommended. Every time the GPU needs it, the upload heap will be marshalled 
     // over. Please read up on Default Heap usage. An upload heap is used here for 
@@ -385,35 +422,45 @@ void EfgInternal::CreateBuffer(void const* data, UINT size)
         &CD3DX12_RESOURCE_DESC::Buffer(size),
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
-        IID_PPV_ARGS(&m_vertexBuffer)));
+        IID_PPV_ARGS(&buffer.m_vertexBuffer)));
     
     // Copy the triangle data to the vertex buffer.
     UINT8* pVertexDataBegin;
     CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
-    ThrowIfFailed(m_vertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
+    ThrowIfFailed(buffer.m_vertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
     memcpy(pVertexDataBegin, data, size);
-    m_vertexBuffer->Unmap(0, nullptr);
+    buffer.m_vertexBuffer->Unmap(0, nullptr);
     
     // Initialize the vertex buffer view.
-    m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
-    m_vertexBufferView.StrideInBytes = sizeof(Vertex);
-    m_vertexBufferView.SizeInBytes = size;
+    buffer.m_vertexBufferView.BufferLocation = buffer.m_vertexBuffer->GetGPUVirtualAddress();
+    buffer.m_vertexBufferView.StrideInBytes = sizeof(Vertex);
+    buffer.m_vertexBufferView.SizeInBytes = size;
+
+    return buffer;
 }
 
-void EfgInternal::CreateGraphicsPipelineState()
+EfgProgram EfgInternal::CreateProgram(LPCWSTR fileName)
 {
-    ComPtr<ID3DBlob> vertexShader;
-    ComPtr<ID3DBlob> pixelShader;
+    EfgProgram program = {};
+    program.source = GetAssetFullPath(fileName);
+    return program;
+}
 
-#if defined(_DEBUG)
-    // Enable better shader debugging with the graphics debugging tools.
-    UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-#else
-    UINT compileFlags = 0;
-#endif
+EfgPSO EfgInternal::CreateGraphicsPipelineState(EfgProgram program)
+{
+    EfgPSO pso = {};
+    CompileProgram(program);
 
-    ThrowIfFailed(D3DCompileFromFile(GetAssetFullPath(L"shaders.hlsl").c_str(), nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, nullptr));
-    ThrowIfFailed(D3DCompileFromFile(GetAssetFullPath(L"shaders.hlsl").c_str(), nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, nullptr));
+    // Create an empty root signature.
+    {
+        CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
+        rootSignatureDesc.Init(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+        ComPtr<ID3DBlob> signature;
+        ComPtr<ID3DBlob> error;
+        ThrowIfFailed(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
+        ThrowIfFailed(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&pso.rootSignature)));
+    }
 
     // Define the vertex input layout.
     D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
@@ -423,21 +470,43 @@ void EfgInternal::CreateGraphicsPipelineState()
     };
 
     // Describe and create the graphics pipeline state object (PSO).
-    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-    psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
-    psoDesc.pRootSignature = m_rootSignature.Get();
-    psoDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader.Get());
-    psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
-    psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-    psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-    psoDesc.DepthStencilState.DepthEnable = FALSE;
-    psoDesc.DepthStencilState.StencilEnable = FALSE;
-    psoDesc.SampleMask = UINT_MAX;
-    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    psoDesc.NumRenderTargets = 1;
-    psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-    psoDesc.SampleDesc.Count = 1;
-    ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
+    pso.desc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
+    pso.desc.pRootSignature = pso.rootSignature.Get();
+    pso.desc.VS = CD3DX12_SHADER_BYTECODE(program.vs.Get());
+    pso.desc.PS = CD3DX12_SHADER_BYTECODE(program.ps.Get());
+    pso.desc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    pso.desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    pso.desc.DepthStencilState.DepthEnable = FALSE;
+    pso.desc.DepthStencilState.StencilEnable = FALSE;
+    pso.desc.SampleMask = UINT_MAX;
+    pso.desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    pso.desc.NumRenderTargets = 1;
+    pso.desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+    pso.desc.SampleDesc.Count = 1;
+    ThrowIfFailed(m_device->CreateGraphicsPipelineState(&pso.desc, IID_PPV_ARGS(&pso.pipelineState)));
+    return pso;
 }
 
+void EfgInternal::SetPipelineState(EfgPSO pso)
+{
+    m_boundPSO = pso;
+}
+
+void EfgInternal::bindVertexBuffer(EfgBuffer buffer)
+{
+    m_boundBuffer = buffer;
+}
+
+void EfgInternal::CompileProgram(EfgProgram& program)
+{
+#if defined(_DEBUG)
+    // Enable better shader debugging with the graphics debugging tools.
+    UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#else
+    UINT compileFlags = 0;
+#endif
+
+    ThrowIfFailed(D3DCompileFromFile(program.source.c_str(), nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &program.vs, nullptr));
+    ThrowIfFailed(D3DCompileFromFile(program.source.c_str(), nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &program.ps, nullptr));
+}
 

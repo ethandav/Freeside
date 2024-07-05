@@ -26,12 +26,12 @@ struct Vertex
     XMFLOAT4 color;
 };
 
-class EfgBuffer
+struct EfgBuffer
 {
-public:
-    ComPtr<ID3D12Resource> m_vertexBuffer;
+    UINT m_size = 0;
+    ComPtr<ID3D12Resource> m_bufferResource;
     D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
-private:
+    D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
 };
 
 struct EfgPSO
@@ -67,6 +67,7 @@ public:
     EfgPSO CreateGraphicsPipelineState(EfgProgram program);
     void SetPipelineState(EfgPSO pso);
     void bindVertexBuffer(EfgBuffer buffer);
+    void bindIndexBuffer(EfgBuffer buffer);
     void DrawInstanced(uint32_t vertexCount);
     void DrawIndexedInstanced(uint32_t indexCount);
     void Render();
@@ -109,7 +110,8 @@ private:
     ComPtr<ID3D12Fence> m_fence;
     UINT64 m_fenceValue = 0;
 
-    EfgBuffer m_boundBuffer;
+    EfgBuffer m_boundVertexBuffer;
+    EfgBuffer m_boundIndexBuffer;
 
     std::wstring GetAssetFullPath(LPCWSTR assetName);
     void LoadPipeline();
@@ -121,6 +123,7 @@ private:
 EfgContext efgCreateContext(HWND window);
 void efgDestroyContext(EfgContext context);
 void efgBindVertexBuffer(EfgContext context, EfgBuffer buffer);
+void efgBindIndexBuffer(EfgContext context, EfgBuffer buffer);
 EfgBuffer efgCreateBuffer(EfgContext context, void const* data, UINT size);
 EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName);
 EfgPSO efgCreateGraphicsPipelineState(EfgContext context, EfgProgram program);
@@ -128,3 +131,10 @@ void efgSetPipelineState(EfgContext efg, EfgPSO pso);
 void efgDrawInstanced(EfgContext efg, uint32_t vertexCount);
 void efgDrawIndexedInstanced(EfgContext efg, uint32_t indexCount);
 void efgRender(EfgContext efg);
+
+template<typename TYPE>
+EfgBuffer efgCreateBuffer(EfgContext context, void const* data, UINT size, uint32_t count)
+{
+    EfgBuffer buffer = efgCreateBuffer(context, data, count * sizeof(TYPE));
+    return buffer;
+}

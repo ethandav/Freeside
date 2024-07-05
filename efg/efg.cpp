@@ -50,6 +50,12 @@ void efgBindVertexBuffer(EfgContext context, EfgBuffer buffer)
     efg->bindVertexBuffer(buffer);
 }
 
+void efgBindIndexBuffer(EfgContext context, EfgBuffer buffer)
+{
+    EfgInternal* efg = EfgInternal::GetEfg(context);
+    efg->bindIndexBuffer(buffer);
+}
+
 void efgDrawInstanced(EfgContext context, uint32_t vertexCount)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
@@ -342,7 +348,7 @@ void EfgInternal::DrawInstanced(uint32_t vertexCount)
     const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
     m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_commandList->IASetVertexBuffers(0, 1, &m_boundBuffer.m_vertexBufferView);
+    m_commandList->IASetVertexBuffers(0, 1, &m_boundVertexBuffer.m_vertexBufferView);
     m_commandList->DrawInstanced(vertexCount, 1, 0, 0);
 }
 
@@ -370,10 +376,11 @@ void EfgInternal::DrawIndexedInstanced(uint32_t indexCount)
     m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
     // Record commands.
-    const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+    const float clearColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
     m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_commandList->IASetVertexBuffers(0, 1, &m_boundBuffer.m_vertexBufferView);
+    m_commandList->IASetVertexBuffers(0, 1, &m_boundVertexBuffer.m_vertexBufferView);
+    m_commandList->IASetIndexBuffer(&m_boundIndexBuffer.m_indexBufferView);
     m_commandList->DrawIndexedInstanced(indexCount, 1, 0, 0, 0);
 }
 
@@ -422,19 +429,15 @@ EfgBuffer EfgInternal::CreateBuffer(void const* data, UINT size)
         &CD3DX12_RESOURCE_DESC::Buffer(size),
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
-        IID_PPV_ARGS(&buffer.m_vertexBuffer)));
+        IID_PPV_ARGS(&buffer.m_bufferResource)));
     
     // Copy the triangle data to the vertex buffer.
     UINT8* pVertexDataBegin;
     CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
-    ThrowIfFailed(buffer.m_vertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
+    ThrowIfFailed(buffer.m_bufferResource->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
     memcpy(pVertexDataBegin, data, size);
-    buffer.m_vertexBuffer->Unmap(0, nullptr);
-    
-    // Initialize the vertex buffer view.
-    buffer.m_vertexBufferView.BufferLocation = buffer.m_vertexBuffer->GetGPUVirtualAddress();
-    buffer.m_vertexBufferView.StrideInBytes = sizeof(Vertex);
-    buffer.m_vertexBufferView.SizeInBytes = size;
+    buffer.m_bufferResource->Unmap(0, nullptr);
+    buffer.m_size = size;
 
     return buffer;
 }
@@ -494,13 +497,25 @@ void EfgInternal::SetPipelineState(EfgPSO pso)
 
 void EfgInternal::bindVertexBuffer(EfgBuffer buffer)
 {
-    m_boundBuffer = buffer;
+    buffer.m_vertexBufferView.BufferLocation = buffer.m_bufferResource->GetGPUVirtualAddress();
+    buffer.m_vertexBufferView.StrideInBytes = sizeof(Vertex);
+    buffer.m_vertexBufferView.SizeInBytes = buffer.m_size;
+
+    m_boundVertexBuffer = buffer;
+}
+
+void EfgInternal::bindIndexBuffer(EfgBuffer buffer)
+{
+    buffer.m_indexBufferView.BufferLocation = buffer.m_bufferResource->GetGPUVirtualAddress();
+    buffer.m_indexBufferView.Format = DXGI_FORMAT_R32_UINT;
+    buffer.m_indexBufferView.SizeInBytes = buffer.m_size; 
+
+    m_boundIndexBuffer = buffer;
 }
 
 void EfgInternal::CompileProgram(EfgProgram& program)
 {
 #if defined(_DEBUG)
-    // Enable better shader debugging with the graphics debugging tools.
     UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 #else
     UINT compileFlags = 0;

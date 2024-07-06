@@ -9,6 +9,11 @@
 //
 //*********************************************************
 
+cbuffer ViewProjectionBuffer : register(b0)
+{
+    matrix viewProjectionMatrix;
+}
+
 struct PSInput
 {
     float4 position : SV_POSITION;

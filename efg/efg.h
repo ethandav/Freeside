@@ -12,6 +12,7 @@
 #include <string>
 #include <wrl.h>
 #include <shellapi.h>
+#include <memory>
 
 #include "../DirectX-Headers/include/directx/d3dx12.h"
 #include "DXHelper.h"
@@ -26,12 +27,20 @@ struct Vertex
     XMFLOAT4 color;
 };
 
+typedef
+enum EFG_BUFFER_TYPE 
+{
+    EFG_VERTEX_BUFFER,
+    EFG_INDEX_BUFFER,
+    EFG_CONSTANT_BUFFER
+} EFG_BUFFER_TYPE;
+
 struct EfgBuffer
 {
+    EFG_BUFFER_TYPE type;
     UINT m_size = 0;
     ComPtr<ID3D12Resource> m_bufferResource;
-    D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
-    D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
+    uint64_t viewHandle;
 };
 
 struct EfgPSO
@@ -62,7 +71,7 @@ public:
 	EfgInternal(EfgContext& efg) { efg.handle = reinterpret_cast<uint64_t>(this); };
 	void initialize(HWND window);
 	static inline EfgInternal* GetEfg(EfgContext& context);
-    EfgBuffer CreateBuffer(void const* data, UINT size);
+    EfgBuffer CreateBuffer(EFG_BUFFER_TYPE bufferType, void const* data, UINT size);
     EfgProgram CreateProgram(LPCWSTR fileName);
     EfgPSO CreateGraphicsPipelineState(EfgProgram program);
     void SetPipelineState(EfgPSO pso);
@@ -100,18 +109,21 @@ private:
     ComPtr<ID3D12CommandAllocator> m_commandAllocator;
     ComPtr<ID3D12CommandQueue> m_commandQueue;
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
+    ComPtr<ID3D12DescriptorHeap> m_cbvHeap;
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
     UINT m_rtvDescriptorSize = 0;
+    UINT m_cbvDescriptorSize = 0;
+
     EfgPSO m_boundPSO = {};
+    EfgBuffer m_boundVertexBuffer = {};
+    EfgBuffer m_boundIndexBuffer = {};
+
 
     // Synchronization objects.
     UINT m_frameIndex = 0;
     HANDLE m_fenceEvent = 0;
     ComPtr<ID3D12Fence> m_fence;
     UINT64 m_fenceValue = 0;
-
-    EfgBuffer m_boundVertexBuffer;
-    EfgBuffer m_boundIndexBuffer;
 
     std::wstring GetAssetFullPath(LPCWSTR assetName);
     void LoadPipeline();
@@ -124,7 +136,8 @@ EfgContext efgCreateContext(HWND window);
 void efgDestroyContext(EfgContext context);
 void efgBindVertexBuffer(EfgContext context, EfgBuffer buffer);
 void efgBindIndexBuffer(EfgContext context, EfgBuffer buffer);
-EfgBuffer efgCreateBuffer(EfgContext context, void const* data, UINT size);
+EfgBuffer efgCreateBuffer(EfgContext context, EFG_BUFFER_TYPE bufferType, void const* data, UINT size);
+void efgDestroyBuffer(EfgBuffer& buffer);
 EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName);
 EfgPSO efgCreateGraphicsPipelineState(EfgContext context, EfgProgram program);
 void efgSetPipelineState(EfgContext efg, EfgPSO pso);
@@ -133,8 +146,8 @@ void efgDrawIndexedInstanced(EfgContext efg, uint32_t indexCount);
 void efgRender(EfgContext efg);
 
 template<typename TYPE>
-EfgBuffer efgCreateBuffer(EfgContext context, void const* data, UINT size, uint32_t count)
+EfgBuffer efgCreateBuffer(EfgContext context, EFG_BUFFER_TYPE bufferType, void const* data, UINT size, uint32_t count)
 {
-    EfgBuffer buffer = efgCreateBuffer(context, data, count * sizeof(TYPE));
+    EfgBuffer buffer = efgCreateBuffer(context, bufferType, data, count * sizeof(TYPE));
     return buffer;
 }

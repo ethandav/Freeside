@@ -24,7 +24,7 @@ PSInput VSMain(float4 position : POSITION, float4 color : COLOR)
 {
     PSInput result;
 
-    result.position = position;
+    result.position = mul(position, viewProjectionMatrix);
     result.color = color;
 
     return result;

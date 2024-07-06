@@ -1,4 +1,5 @@
 #include "efg.h"
+#include <iostream>
 
 EfgContext efgCreateContext(HWND window)
 {
@@ -20,6 +21,12 @@ void efgRender(EfgContext context)
     efg->Render();
 }
 
+void efgCreateCBVDescriptorHeap(EfgContext context, uint32_t numDescriptors)
+{
+	EfgInternal* efg = EfgInternal::GetEfg(context);
+    efg->createCBVDescriptorHeap(numDescriptors);
+}
+
 EfgBuffer efgCreateBuffer(EfgContext context, EFG_BUFFER_TYPE bufferType, void const* data, UINT size)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
@@ -35,9 +42,6 @@ void efgDestroyBuffer(EfgBuffer& buffer)
         break;
     case EFG_INDEX_BUFFER:
         delete reinterpret_cast<D3D12_INDEX_BUFFER_VIEW*>(buffer.viewHandle);
-        break;
-    case EFG_CONSTANT_BUFFER:
-        delete reinterpret_cast<D3D12_CONSTANT_BUFFER_VIEW_DESC*>(buffer.viewHandle);
         break;
     }
 }
@@ -274,13 +278,53 @@ void EfgInternal::LoadPipeline()
 
         m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
-        D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
-        cbvHeapDesc.NumDescriptors = 1;
-        cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-        cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-        ThrowIfFailed(m_device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap)));
+    }
 
-        m_cbvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    {
+        // Define a root parameter for the descriptor table
+        D3D12_ROOT_PARAMETER rootParameters[1];
+        rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        rootParameters[0].DescriptorTable.NumDescriptorRanges = 1;
+        rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+        D3D12_DESCRIPTOR_RANGE descriptorRange;
+        descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+        descriptorRange.NumDescriptors = 1;
+        descriptorRange.BaseShaderRegister = 0;
+        descriptorRange.RegisterSpace = 0;
+        descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+        rootParameters[0].DescriptorTable.pDescriptorRanges = &descriptorRange;
+
+        // Create the root signature description
+        D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc;
+        rootSignatureDesc.NumParameters = _countof(rootParameters);
+        rootSignatureDesc.pParameters = rootParameters;
+        rootSignatureDesc.NumStaticSamplers = 0;
+        rootSignatureDesc.pStaticSamplers = nullptr;
+        rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+        Microsoft::WRL::ComPtr<ID3DBlob> serializedRootSignature;
+        Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
+        HRESULT hr = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &serializedRootSignature, &errorBlob);
+        if (FAILED(hr))
+        {
+            if (errorBlob)
+            {
+                std::cerr << "D3D12SerializeRootSignature failed: " << static_cast<const char*>(errorBlob->GetBufferPointer()) << std::endl;
+            }
+            ThrowIfFailed(hr);
+        }
+
+        hr = m_device->CreateRootSignature(0, serializedRootSignature->GetBufferPointer(), serializedRootSignature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature));
+        if (FAILED(hr))
+        {
+            if (errorBlob)
+            {
+                std::cerr << "CreateRootSignature failed: " << static_cast<const char*>(errorBlob->GetBufferPointer()) << std::endl;
+            }
+            ThrowIfFailed(hr);
+        }
     }
 
     // Create frame resources.
@@ -345,6 +389,20 @@ void EfgInternal::Render()
     WaitForPreviousFrame();
 }
 
+void EfgInternal::createCBVDescriptorHeap(uint32_t numDescriptors)
+{
+    if (numDescriptors > 0)
+    {
+        D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
+        cbvHeapDesc.NumDescriptors = numDescriptors;
+        cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        ThrowIfFailed(m_device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap)));
+
+        m_cbvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
+}
+
 void EfgInternal::DrawInstanced(uint32_t vertexCount)
 {
     // Command list allocators can only be reset when the associated 
@@ -358,9 +416,16 @@ void EfgInternal::DrawInstanced(uint32_t vertexCount)
     ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), m_boundPSO.pipelineState.Get()));
 
     // Set necessary state.
-    m_commandList->SetGraphicsRootSignature(m_boundPSO.rootSignature.Get());
+    //m_commandList->SetGraphicsRootSignature(m_boundPSO.rootSignature.Get());
+    m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
     m_commandList->RSSetViewports(1, &m_viewport);
     m_commandList->RSSetScissorRects(1, &m_scissorRect);
+
+    // BInd descriptor heaps
+    ID3D12DescriptorHeap* descriptorHeaps[] = { m_cbvHeap.Get() };
+    m_commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+    // Set the root descriptor table.
+    m_commandList->SetGraphicsRootDescriptorTable(0, m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
 
     // Indicate that the back buffer will be used as a render target.
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
@@ -389,9 +454,16 @@ void EfgInternal::DrawIndexedInstanced(uint32_t indexCount)
     ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), m_boundPSO.pipelineState.Get()));
 
     // Set necessary state.
-    m_commandList->SetGraphicsRootSignature(m_boundPSO.rootSignature.Get());
+    //m_commandList->SetGraphicsRootSignature(m_boundPSO.rootSignature.Get());
+    m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
     m_commandList->RSSetViewports(1, &m_viewport);
     m_commandList->RSSetScissorRects(1, &m_scissorRect);
+
+    // BInd descriptor heaps
+    ID3D12DescriptorHeap* descriptorHeaps[] = { m_cbvHeap.Get() };
+    m_commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+    // Set the root descriptor table.
+    m_commandList->SetGraphicsRootDescriptorTable(0, m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
 
     // Indicate that the back buffer will be used as a render target.
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
@@ -442,6 +514,10 @@ void EfgInternal::WaitForPreviousFrame()
 EfgBuffer EfgInternal::CreateBuffer(EFG_BUFFER_TYPE bufferType, void const* data, UINT size)
 {
     EfgBuffer buffer = { };
+    UINT alignmentSize = size;
+
+    if(bufferType == EFG_CONSTANT_BUFFER)
+        alignmentSize = (size + 255) & ~255; // CB size must be a multiple of 256 bytes.
 
     // Note: using upload heaps to transfer static data like vert buffers is not 
     // recommended. Every time the GPU needs it, the upload heap will be marshalled 
@@ -450,7 +526,7 @@ EfgBuffer EfgInternal::CreateBuffer(EFG_BUFFER_TYPE bufferType, void const* data
     ThrowIfFailed(m_device->CreateCommittedResource(
         &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
         D3D12_HEAP_FLAG_NONE,
-        &CD3DX12_RESOURCE_DESC::Buffer(size),
+        &CD3DX12_RESOURCE_DESC::Buffer(alignmentSize),
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
         IID_PPV_ARGS(&buffer.m_bufferResource)));
@@ -486,10 +562,15 @@ EfgBuffer EfgInternal::CreateBuffer(EFG_BUFFER_TYPE bufferType, void const* data
         }
     case EFG_CONSTANT_BUFFER:
         {
+            CD3DX12_CPU_DESCRIPTOR_HANDLE cbvHandle(m_cbvHeap->GetCPUDescriptorHandleForHeapStart());
+            cbvHandle.Offset(m_cbvDescriptorCount, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
+
             D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
             cbvDesc.BufferLocation = buffer.m_bufferResource->GetGPUVirtualAddress();
-            cbvDesc.SizeInBytes = (buffer.m_size + 255) & ~255; // CB size must be a multiple of 256 bytes.
-            m_device->CreateConstantBufferView(&cbvDesc, m_cbvHeap->GetCPUDescriptorHandleForHeapStart());
+            cbvDesc.SizeInBytes = alignmentSize; // CB size must be a multiple of 256 bytes.
+            m_device->CreateConstantBufferView(&cbvDesc, cbvHandle);
+            m_cbvDescriptorCount++;
+            buffer.viewHandle = reinterpret_cast<uint64_t>(&cbvHandle);
             break;
         }
     };
@@ -529,7 +610,7 @@ EfgPSO EfgInternal::CreateGraphicsPipelineState(EfgProgram program)
 
     // Describe and create the graphics pipeline state object (PSO).
     pso.desc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
-    pso.desc.pRootSignature = pso.rootSignature.Get();
+    pso.desc.pRootSignature = m_rootSignature.Get();
     pso.desc.VS = CD3DX12_SHADER_BYTECODE(program.vs.Get());
     pso.desc.PS = CD3DX12_SHADER_BYTECODE(program.ps.Get());
     pso.desc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);

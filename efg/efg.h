@@ -80,6 +80,7 @@ public:
     void DrawInstanced(uint32_t vertexCount);
     void DrawIndexedInstanced(uint32_t indexCount);
     void Render();
+    void createCBVDescriptorHeap(uint32_t numDescriptors);
     void Destroy();
 
 
@@ -111,8 +112,10 @@ private:
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
     ComPtr<ID3D12DescriptorHeap> m_cbvHeap;
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
+    ComPtr<ID3D12RootSignature> m_rootSignature;
     UINT m_rtvDescriptorSize = 0;
     UINT m_cbvDescriptorSize = 0;
+    uint32_t m_cbvDescriptorCount = 0;
 
     EfgPSO m_boundPSO = {};
     EfgBuffer m_boundVertexBuffer = {};
@@ -144,6 +147,7 @@ void efgSetPipelineState(EfgContext efg, EfgPSO pso);
 void efgDrawInstanced(EfgContext efg, uint32_t vertexCount);
 void efgDrawIndexedInstanced(EfgContext efg, uint32_t indexCount);
 void efgRender(EfgContext efg);
+void efgCreateCBVDescriptorHeap(EfgContext context, uint32_t numDescriptors);
 
 template<typename TYPE>
 EfgBuffer efgCreateBuffer(EfgContext context, EFG_BUFFER_TYPE bufferType, void const* data, UINT size, uint32_t count)

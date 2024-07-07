@@ -267,20 +267,42 @@ void EfgInternal::LoadPipeline()
     ThrowIfFailed(swapChain.As(&m_swapChain));
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-    // Create descriptor heaps.
+    m_rtvHeap = CreateDescriptorHeap(FrameCount, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
+    // Create frame resources.
     {
-        // Describe and create a render target view (RTV) descriptor heap.
-        D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-        rtvHeapDesc.NumDescriptors = FrameCount;
-        rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-        rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-        ThrowIfFailed(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
+        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
 
-        m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-
+        // Create a RTV for each frame.
+        for (UINT n = 0; n < FrameCount; n++)
+        {
+            ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
+            m_device->CreateRenderTargetView(m_renderTargets[n].Get(), nullptr, rtvHandle);
+            rtvHandle.Offset(1, m_rtvDescriptorSize);
+        }
     }
 
-    {
+    ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
+}
+
+ComPtr<ID3D12DescriptorHeap> EfgInternal::CreateDescriptorHeap(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type)
+{
+    ComPtr<ID3D12DescriptorHeap> heap = {};
+    D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+    heapDesc.NumDescriptors = numDescriptors;
+    heapDesc.Type = type;
+    heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+    ThrowIfFailed(m_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&heap)));
+
+    if (!m_rootSignature)
+        CreateRootSignature(numDescriptors);
+
+    return heap;
+}
+
+void EfgInternal::CreateRootSignature(uint32_t numDescriptors)
+{
         // Define a root parameter for the descriptor table
         D3D12_ROOT_PARAMETER rootParameters[1];
         rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -289,7 +311,7 @@ void EfgInternal::LoadPipeline()
 
         D3D12_DESCRIPTOR_RANGE descriptorRange;
         descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-        descriptorRange.NumDescriptors = 1;
+        descriptorRange.NumDescriptors = numDescriptors;
         descriptorRange.BaseShaderRegister = 0;
         descriptorRange.RegisterSpace = 0;
         descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
@@ -306,41 +328,8 @@ void EfgInternal::LoadPipeline()
 
         Microsoft::WRL::ComPtr<ID3DBlob> serializedRootSignature;
         Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
-        HRESULT hr = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &serializedRootSignature, &errorBlob);
-        if (FAILED(hr))
-        {
-            if (errorBlob)
-            {
-                std::cerr << "D3D12SerializeRootSignature failed: " << static_cast<const char*>(errorBlob->GetBufferPointer()) << std::endl;
-            }
-            ThrowIfFailed(hr);
-        }
-
-        hr = m_device->CreateRootSignature(0, serializedRootSignature->GetBufferPointer(), serializedRootSignature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature));
-        if (FAILED(hr))
-        {
-            if (errorBlob)
-            {
-                std::cerr << "CreateRootSignature failed: " << static_cast<const char*>(errorBlob->GetBufferPointer()) << std::endl;
-            }
-            ThrowIfFailed(hr);
-        }
-    }
-
-    // Create frame resources.
-    {
-        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
-
-        // Create a RTV for each frame.
-        for (UINT n = 0; n < FrameCount; n++)
-        {
-            ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
-            m_device->CreateRenderTargetView(m_renderTargets[n].Get(), nullptr, rtvHandle);
-            rtvHandle.Offset(1, m_rtvDescriptorSize);
-        }
-    }
-
-    ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
+        ThrowIfFailed(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &serializedRootSignature, &errorBlob));
+        ThrowIfFailed(m_device->CreateRootSignature(0, serializedRootSignature->GetBufferPointer(), serializedRootSignature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
 }
 
 // Load the sample assets.
@@ -403,6 +392,16 @@ void EfgInternal::createCBVDescriptorHeap(uint32_t numDescriptors)
     }
 }
 
+void EfgInternal::bindCBVDescriptorHeaps()
+{
+    CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
+    ID3D12DescriptorHeap* descriptorHeaps[] = { m_cbvHeap.Get() };
+    m_commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
+    for(uint32_t i = 0; i < m_cbvDescriptorCount; i++)
+        m_commandList->SetGraphicsRootDescriptorTable(0, m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
+}
+
 void EfgInternal::DrawInstanced(uint32_t vertexCount)
 {
     // Command list allocators can only be reset when the associated 
@@ -421,11 +420,7 @@ void EfgInternal::DrawInstanced(uint32_t vertexCount)
     m_commandList->RSSetViewports(1, &m_viewport);
     m_commandList->RSSetScissorRects(1, &m_scissorRect);
 
-    // BInd descriptor heaps
-    ID3D12DescriptorHeap* descriptorHeaps[] = { m_cbvHeap.Get() };
-    m_commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
-    // Set the root descriptor table.
-    m_commandList->SetGraphicsRootDescriptorTable(0, m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
+    bindCBVDescriptorHeaps();
 
     // Indicate that the back buffer will be used as a render target.
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
@@ -439,6 +434,8 @@ void EfgInternal::DrawInstanced(uint32_t vertexCount)
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_commandList->IASetVertexBuffers(0, 1, reinterpret_cast<D3D12_VERTEX_BUFFER_VIEW*>(m_boundVertexBuffer.viewHandle));
     m_commandList->DrawInstanced(vertexCount, 1, 0, 0);
+
+    m_boundVertexBuffer = {};
 }
 
 void EfgInternal::DrawIndexedInstanced(uint32_t indexCount)
@@ -459,11 +456,7 @@ void EfgInternal::DrawIndexedInstanced(uint32_t indexCount)
     m_commandList->RSSetViewports(1, &m_viewport);
     m_commandList->RSSetScissorRects(1, &m_scissorRect);
 
-    // BInd descriptor heaps
-    ID3D12DescriptorHeap* descriptorHeaps[] = { m_cbvHeap.Get() };
-    m_commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
-    // Set the root descriptor table.
-    m_commandList->SetGraphicsRootDescriptorTable(0, m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
+    bindCBVDescriptorHeaps();
 
     // Indicate that the back buffer will be used as a render target.
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
@@ -478,6 +471,9 @@ void EfgInternal::DrawIndexedInstanced(uint32_t indexCount)
     m_commandList->IASetVertexBuffers(0, 1, reinterpret_cast<D3D12_VERTEX_BUFFER_VIEW*>(m_boundVertexBuffer.viewHandle));
     m_commandList->IASetIndexBuffer(reinterpret_cast<D3D12_INDEX_BUFFER_VIEW*>(m_boundIndexBuffer.viewHandle));
     m_commandList->DrawIndexedInstanced(indexCount, 1, 0, 0, 0);
+
+    m_boundVertexBuffer = {};
+    m_boundIndexBuffer = {};
 }
 
 void EfgInternal::Destroy()

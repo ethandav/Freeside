@@ -81,16 +81,18 @@ int main()
     // View-Projection matrix
     DirectX::XMMATRIX viewProjectionMatrix = viewMatrix * projectionMatrix;
 
-    efgCreateCBVDescriptorHeap(efg, 1);
+    efgCreateCBVDescriptorHeap(efg, 2);
+
+    int test = 12;
 
     //EfgBuffer vertexBuffer = efgCreateBuffer<Vertex>(efg, triangleVertices, sizeof(triangleVertices), 3);
     EfgBuffer vertexBuffer = efgCreateBuffer<Vertex>(efg, EFG_VERTEX_BUFFER, squareVertices, sizeof(squareVertices), 4);
     EfgBuffer indexBuffer = efgCreateBuffer<uint32_t>(efg, EFG_INDEX_BUFFER, squareIndices, sizeof(squareIndices), 6);
     EfgBuffer constantBuffer = efgCreateBuffer<XMMATRIX>(efg, EFG_CONSTANT_BUFFER, &viewProjectionMatrix, sizeof(viewProjectionMatrix), 1);
+    EfgBuffer constantBuffer2 = efgCreateBuffer<int>(efg, EFG_CONSTANT_BUFFER, &test, sizeof(test), 1);
 
     EfgProgram program = efgCreateProgram(efg, L"shaders.hlsl");
     EfgPSO pso = efgCreateGraphicsPipelineState(efg, program);
-
 
     while (efgWindowIsRunning(efgWindow))
     {

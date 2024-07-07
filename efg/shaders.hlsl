@@ -14,6 +14,11 @@ cbuffer ViewProjectionBuffer : register(b0)
     matrix viewProjectionMatrix;
 }
 
+cbuffer testBuffer : register(b1)
+{
+    int test;
+}
+
 struct PSInput
 {
     float4 position : SV_POSITION;
@@ -24,7 +29,7 @@ PSInput VSMain(float4 position : POSITION, float4 color : COLOR)
 {
     PSInput result;
 
-    result.position = mul(position, viewProjectionMatrix);
+    result.position = mul(position + test, viewProjectionMatrix);
     result.color = color;
 
     return result;

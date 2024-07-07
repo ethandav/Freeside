@@ -92,6 +92,9 @@ private:
     );
 
     void CompileProgram(EfgProgram& program);
+    void CreateRootSignature(uint32_t numDescriptors);
+    void bindCBVDescriptorHeaps();
+    ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type);
 
 	HWND window_ = {};
     static const UINT FrameCount = 2;

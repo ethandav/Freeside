@@ -124,6 +124,7 @@ private:
     void ExecuteCommandList();
     void WaitForGpu();
     void CreateBuffer(void const* data, EfgBuffer& buffer, EFG_CPU_ACCESS cpuAccess);
+    void CopyResourceToBuffer(EfgBuffer dest, ComPtr<ID3D12Resource> src);
     ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type);
     ComPtr<ID3D12Resource> CreateBufferResource(EFG_CPU_ACCESS cpuAccess, UINT size);
 

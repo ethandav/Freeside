@@ -571,25 +571,27 @@ void EfgInternal::CreateBuffer(void const* data, EfgBuffer& buffer, EFG_CPU_ACCE
     uploadResource->Unmap(0, nullptr);
 
     if (cpuAccess != EFG_CPU_WRITE)
-    {
-        ResetCommandList();
+        CopyResourceToBuffer(buffer, uploadResource);
+}
 
-        m_commandList->CopyBufferRegion(buffer.m_bufferResource.Get(), 0, uploadResource.Get(), 0, buffer.alignmentSize);
+void EfgInternal::CopyResourceToBuffer(EfgBuffer dest, ComPtr<ID3D12Resource> src)
+{
+    ResetCommandList();
+    
+    m_commandList->CopyBufferRegion(dest.m_bufferResource.Get(), 0, src.Get(), 0, dest.alignmentSize);
+    
+    D3D12_RESOURCE_BARRIER barrier = {};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    barrier.Transition.pResource = dest.m_bufferResource.Get();
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    
+    m_commandList->ResourceBarrier(1, &barrier);
 
-        D3D12_RESOURCE_BARRIER barrier = {};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-        barrier.Transition.pResource = buffer.m_bufferResource.Get();
-        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-
-        m_commandList->ResourceBarrier(1, &barrier);
-        
-        ExecuteCommandList();
-
-        WaitForGpu();
-    }
+    ExecuteCommandList();
+    WaitForGpu();
 }
 
 EfgVertexBuffer EfgInternal::CreateVertexBuffer(void const* data, UINT size)

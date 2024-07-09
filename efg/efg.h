@@ -95,6 +95,7 @@ private:
     void CreateRootSignature(uint32_t numDescriptors);
     void bindCBVDescriptorHeaps();
     ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type);
+    ComPtr<ID3D12Resource> CreateBufferResource(D3D12_HEAP_TYPE cpuAccess, D3D12_RESOURCE_STATES resourceState, UINT size);
 
 	HWND window_ = {};
     static const UINT FrameCount = 2;

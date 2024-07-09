@@ -507,32 +507,66 @@ void EfgInternal::WaitForPreviousFrame()
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 }
 
+ComPtr<ID3D12Resource> EfgInternal::CreateBufferResource(D3D12_HEAP_TYPE cpuAccess, D3D12_RESOURCE_STATES resourceState, UINT size)
+{
+    ComPtr<ID3D12Resource> resource = {};
+
+    D3D12_RESOURCE_DESC resourceDesc = {};
+    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    resourceDesc.Width = size;
+    resourceDesc.Height = 1;
+    resourceDesc.DepthOrArraySize = 1;
+    resourceDesc.MipLevels = 1;
+    resourceDesc.SampleDesc.Count = 1;
+    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = cpuAccess;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProps.CreationNodeMask = 1;
+    heapProps.VisibleNodeMask = 1;
+
+    ThrowIfFailed(m_device->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &resourceDesc,
+        resourceState,
+        nullptr,
+        IID_PPV_ARGS(&resource)
+    ));
+
+    return resource;
+}
+
 EfgBuffer EfgInternal::CreateBuffer(EFG_BUFFER_TYPE bufferType, void const* data, UINT size)
 {
     EfgBuffer buffer = { };
     UINT alignmentSize = size;
+    D3D12_HEAP_TYPE cpuAccess = D3D12_HEAP_TYPE_DEFAULT;
+    D3D12_RESOURCE_STATES resourceState = D3D12_RESOURCE_STATE_COPY_DEST;
+    ComPtr<ID3D12Resource> uploadResource;
 
     if(bufferType == EFG_CONSTANT_BUFFER)
+    {
+        cpuAccess = D3D12_HEAP_TYPE_UPLOAD;
+        resourceState = D3D12_RESOURCE_STATE_GENERIC_READ;
         alignmentSize = (size + 255) & ~255; // CB size must be a multiple of 256 bytes.
+    }
 
-    // Note: using upload heaps to transfer static data like vert buffers is not 
-    // recommended. Every time the GPU needs it, the upload heap will be marshalled 
-    // over. Please read up on Default Heap usage. An upload heap is used here for 
-    // code simplicity and because there are very few verts to actually transfer.
-    ThrowIfFailed(m_device->CreateCommittedResource(
-        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-        D3D12_HEAP_FLAG_NONE,
-        &CD3DX12_RESOURCE_DESC::Buffer(alignmentSize),
-        D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr,
-        IID_PPV_ARGS(&buffer.m_bufferResource)));
+    buffer.m_bufferResource = CreateBufferResource(cpuAccess, resourceState, alignmentSize);
+
+    if (cpuAccess != D3D12_HEAP_TYPE_UPLOAD)
+        uploadResource = CreateBufferResource(D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_GENERIC_READ, alignmentSize);
+    else
+        uploadResource = buffer.m_bufferResource;
     
     // Copy the triangle data to the vertex buffer.
     UINT8* pVertexDataBegin;
     CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
-    ThrowIfFailed(buffer.m_bufferResource->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
+    ThrowIfFailed(uploadResource->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
     memcpy(pVertexDataBegin, data, size);
-    buffer.m_bufferResource->Unmap(0, nullptr);
+    uploadResource->Unmap(0, nullptr);
     buffer.m_size = size;
     buffer.type = bufferType;
 
@@ -570,6 +604,39 @@ EfgBuffer EfgInternal::CreateBuffer(EFG_BUFFER_TYPE bufferType, void const* data
             break;
         }
     };
+
+    if (cpuAccess != D3D12_HEAP_TYPE_UPLOAD)
+    {
+        // Reset the command list before recording new commands.
+        ThrowIfFailed(m_commandAllocator->Reset());
+        ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), nullptr));
+
+        m_commandList->CopyBufferRegion(buffer.m_bufferResource.Get(), 0, uploadResource.Get(), 0, alignmentSize);
+
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+        barrier.Transition.pResource = buffer.m_bufferResource.Get();
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+        m_commandList->ResourceBarrier(1, &barrier);
+        
+        m_commandList->Close();
+        ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
+        m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+
+        m_fenceValue++;
+        m_commandQueue->Signal(m_fence.Get(), m_fenceValue);
+        if (m_fence->GetCompletedValue() < m_fenceValue)
+        {
+            HANDLE eventHandle = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
+            m_fence->SetEventOnCompletion(m_fenceValue, eventHandle);
+            WaitForSingleObject(eventHandle, INFINITE);
+            CloseHandle(eventHandle);
+        }
+    }
 
     return buffer;
 }

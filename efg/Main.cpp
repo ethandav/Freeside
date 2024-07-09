@@ -83,13 +83,13 @@ int main()
 
     efgCreateCBVDescriptorHeap(efg, 2);
 
-    int test = 12;
+    int test = 1;
 
     //EfgBuffer vertexBuffer = efgCreateBuffer<Vertex>(efg, triangleVertices, sizeof(triangleVertices), 3);
-    EfgBuffer vertexBuffer = efgCreateBuffer<Vertex>(efg, EFG_VERTEX_BUFFER, squareVertices, sizeof(squareVertices), 4);
-    EfgBuffer indexBuffer = efgCreateBuffer<uint32_t>(efg, EFG_INDEX_BUFFER, squareIndices, sizeof(squareIndices), 6);
-    EfgBuffer constantBuffer = efgCreateBuffer<XMMATRIX>(efg, EFG_CONSTANT_BUFFER, &viewProjectionMatrix, sizeof(viewProjectionMatrix), 1);
-    EfgBuffer constantBuffer2 = efgCreateBuffer<int>(efg, EFG_CONSTANT_BUFFER, &test, sizeof(test), 1);
+    EfgVertexBuffer vertexBuffer = efgCreateVertexBuffer<Vertex>(efg, squareVertices, sizeof(squareVertices), 4);
+    EfgIndexBuffer indexBuffer = efgCreateIndexBuffer<uint32_t>(efg, squareIndices, sizeof(squareIndices), 6);
+    EfgConstantBuffer constantBuffer = efgCreateConstantBuffer<XMMATRIX>(efg, &viewProjectionMatrix, sizeof(viewProjectionMatrix), 1);
+    EfgConstantBuffer constantBuffer2 = efgCreateConstantBuffer<int>(efg, &test, sizeof(test), 1);
 
     EfgProgram program = efgCreateProgram(efg, L"shaders.hlsl");
     EfgPSO pso = efgCreateGraphicsPipelineState(efg, program);
@@ -103,9 +103,6 @@ int main()
         efgDrawIndexedInstanced(efg, 6);
         efgRender(efg);
     }
-
-    efgDestroyBuffer(vertexBuffer);
-    efgDestroyBuffer(indexBuffer);
 
     efgDestroyWindow(efgWindow);
     efgDestroyContext(efg);

@@ -35,12 +35,36 @@ enum EFG_BUFFER_TYPE
     EFG_CONSTANT_BUFFER
 } EFG_BUFFER_TYPE;
 
+typedef
+enum EFG_CPU_ACCESS 
+{
+    EFG_CPU_NONE,
+    EFG_CPU_READ,
+    EFG_CPU_WRITE
+} EFG_CPU_ACCESS;
+
 struct EfgBuffer
 {
     EFG_BUFFER_TYPE type;
-    UINT m_size = 0;
+    UINT size = 0;
+    UINT alignmentSize = 0;
     ComPtr<ID3D12Resource> m_bufferResource;
-    uint64_t viewHandle;
+};
+
+struct EfgVertexBuffer : public EfgBuffer
+{
+    D3D12_VERTEX_BUFFER_VIEW view = {};
+};
+
+struct EfgIndexBuffer : public EfgBuffer
+{
+    D3D12_INDEX_BUFFER_VIEW view = {};
+};
+
+struct EfgConstantBuffer : public EfgBuffer
+{
+    D3D12_CONSTANT_BUFFER_VIEW_DESC viewDesc = {};
+    CD3DX12_CPU_DESCRIPTOR_HANDLE cbvHandle = {};
 };
 
 struct EfgPSO
@@ -71,12 +95,14 @@ public:
 	EfgInternal(EfgContext& efg) { efg.handle = reinterpret_cast<uint64_t>(this); };
 	void initialize(HWND window);
 	static inline EfgInternal* GetEfg(EfgContext& context);
-    EfgBuffer CreateBuffer(EFG_BUFFER_TYPE bufferType, void const* data, UINT size);
+    EfgVertexBuffer CreateVertexBuffer(void const* data, UINT size);
+    EfgIndexBuffer CreateIndexBuffer(void const* data, UINT size);
+    EfgConstantBuffer CreateConstantBuffer(void const* data, UINT size);
     EfgProgram CreateProgram(LPCWSTR fileName);
     EfgPSO CreateGraphicsPipelineState(EfgProgram program);
     void SetPipelineState(EfgPSO pso);
-    void bindVertexBuffer(EfgBuffer buffer);
-    void bindIndexBuffer(EfgBuffer buffer);
+    void BindVertexBuffer(EfgVertexBuffer buffer);
+    void BindIndexBuffer(EfgIndexBuffer buffer);
     void DrawInstanced(uint32_t vertexCount);
     void DrawIndexedInstanced(uint32_t indexCount);
     void Render();
@@ -96,8 +122,9 @@ private:
     void bindCBVDescriptorHeaps();
     void ResetCommandList();
     void WaitForGpu();
+    void CreateBuffer(void const* data, EfgBuffer& buffer, EFG_CPU_ACCESS cpuAccess);
     ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type);
-    ComPtr<ID3D12Resource> CreateBufferResource(D3D12_HEAP_TYPE cpuAccess, D3D12_RESOURCE_STATES resourceState, UINT size);
+    ComPtr<ID3D12Resource> CreateBufferResource(EFG_CPU_ACCESS cpuAccess, UINT size);
 
 	HWND window_ = {};
     static const UINT FrameCount = 2;
@@ -124,8 +151,8 @@ private:
     uint32_t m_cbvDescriptorCount = 0;
 
     EfgPSO m_boundPSO = {};
-    EfgBuffer m_boundVertexBuffer = {};
-    EfgBuffer m_boundIndexBuffer = {};
+    EfgVertexBuffer m_boundVertexBuffer = {};
+    EfgIndexBuffer m_boundIndexBuffer = {};
 
 
     // Synchronization objects.
@@ -143,10 +170,11 @@ private:
 
 EfgContext efgCreateContext(HWND window);
 void efgDestroyContext(EfgContext context);
-void efgBindVertexBuffer(EfgContext context, EfgBuffer buffer);
-void efgBindIndexBuffer(EfgContext context, EfgBuffer buffer);
-EfgBuffer efgCreateBuffer(EfgContext context, EFG_BUFFER_TYPE bufferType, void const* data, UINT size);
-void efgDestroyBuffer(EfgBuffer& buffer);
+void efgBindVertexBuffer(EfgContext context, EfgVertexBuffer buffer);
+void efgBindIndexBuffer(EfgContext context, EfgIndexBuffer buffer);
+EfgVertexBuffer efgCreateVertexBuffer(EfgContext context, void const* data, UINT size);
+EfgIndexBuffer efgCreateIndexBuffer(EfgContext context, void const* data, UINT size);
+EfgConstantBuffer efgCreateConstantBuffer(EfgContext context, void const* data, UINT size);
 EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName);
 EfgPSO efgCreateGraphicsPipelineState(EfgContext context, EfgProgram program);
 void efgSetPipelineState(EfgContext efg, EfgPSO pso);
@@ -156,8 +184,22 @@ void efgRender(EfgContext efg);
 void efgCreateCBVDescriptorHeap(EfgContext context, uint32_t numDescriptors);
 
 template<typename TYPE>
-EfgBuffer efgCreateBuffer(EfgContext context, EFG_BUFFER_TYPE bufferType, void const* data, UINT size, uint32_t count)
+EfgVertexBuffer efgCreateVertexBuffer(EfgContext context, void const* data, UINT size, uint32_t count)
 {
-    EfgBuffer buffer = efgCreateBuffer(context, bufferType, data, count * sizeof(TYPE));
+    EfgVertexBuffer buffer = efgCreateVertexBuffer(context, data, count * sizeof(TYPE));
+    return buffer;
+}
+
+template<typename TYPE>
+EfgIndexBuffer efgCreateIndexBuffer(EfgContext context, void const* data, UINT size, uint32_t count)
+{
+    EfgIndexBuffer buffer = efgCreateIndexBuffer(context, data, count * sizeof(TYPE));
+    return buffer;
+}
+
+template<typename TYPE>
+EfgConstantBuffer efgCreateConstantBuffer(EfgContext context, void const* data, UINT size, uint32_t count)
+{
+    EfgConstantBuffer buffer = efgCreateConstantBuffer(context, data, count * sizeof(TYPE));
     return buffer;
 }

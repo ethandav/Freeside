@@ -27,25 +27,6 @@ void efgCreateCBVDescriptorHeap(EfgContext context, uint32_t numDescriptors)
     efg->createCBVDescriptorHeap(numDescriptors);
 }
 
-EfgBuffer efgCreateBuffer(EfgContext context, EFG_BUFFER_TYPE bufferType, void const* data, UINT size)
-{
-    EfgInternal* efg = EfgInternal::GetEfg(context);
-    return efg->CreateBuffer(bufferType, data, size);
-}
-
-void efgDestroyBuffer(EfgBuffer& buffer)
-{
-    switch (buffer.type)
-    {
-    case EFG_VERTEX_BUFFER:
-        delete reinterpret_cast<D3D12_VERTEX_BUFFER_VIEW*>(buffer.viewHandle);
-        break;
-    case EFG_INDEX_BUFFER:
-        delete reinterpret_cast<D3D12_INDEX_BUFFER_VIEW*>(buffer.viewHandle);
-        break;
-    }
-}
-
 EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
@@ -64,16 +45,34 @@ void efgSetPipelineState(EfgContext context, EfgPSO pso)
     efg->SetPipelineState(pso);
 }
 
-void efgBindVertexBuffer(EfgContext context, EfgBuffer buffer)
+EfgVertexBuffer efgCreateVertexBuffer(EfgContext context, void const* data, UINT size)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
-    efg->bindVertexBuffer(buffer);
+    return efg->CreateVertexBuffer(data, size);
 }
 
-void efgBindIndexBuffer(EfgContext context, EfgBuffer buffer)
+EfgIndexBuffer efgCreateIndexBuffer(EfgContext context, void const* data, UINT size)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
-    efg->bindIndexBuffer(buffer);
+    return efg->CreateIndexBuffer(data, size);
+}
+
+EfgConstantBuffer efgCreateConstantBuffer(EfgContext context, void const* data, UINT size)
+{
+    EfgInternal* efg = EfgInternal::GetEfg(context);
+    return efg->CreateConstantBuffer(data, size);
+}
+
+void efgBindVertexBuffer(EfgContext context, EfgVertexBuffer buffer)
+{
+    EfgInternal* efg = EfgInternal::GetEfg(context);
+    efg->BindVertexBuffer(buffer);
+}
+
+void efgBindIndexBuffer(EfgContext context, EfgIndexBuffer buffer)
+{
+    EfgInternal* efg = EfgInternal::GetEfg(context);
+    efg->BindIndexBuffer(buffer);
 }
 
 void efgDrawInstanced(EfgContext context, uint32_t vertexCount)
@@ -432,7 +431,7 @@ void EfgInternal::DrawInstanced(uint32_t vertexCount)
     const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
     m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_commandList->IASetVertexBuffers(0, 1, reinterpret_cast<D3D12_VERTEX_BUFFER_VIEW*>(m_boundVertexBuffer.viewHandle));
+    m_commandList->IASetVertexBuffers(0, 1, &m_boundVertexBuffer.view);
     m_commandList->DrawInstanced(vertexCount, 1, 0, 0);
 
     m_boundVertexBuffer = {};
@@ -468,8 +467,8 @@ void EfgInternal::DrawIndexedInstanced(uint32_t indexCount)
     const float clearColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
     m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_commandList->IASetVertexBuffers(0, 1, reinterpret_cast<D3D12_VERTEX_BUFFER_VIEW*>(m_boundVertexBuffer.viewHandle));
-    m_commandList->IASetIndexBuffer(reinterpret_cast<D3D12_INDEX_BUFFER_VIEW*>(m_boundIndexBuffer.viewHandle));
+    m_commandList->IASetVertexBuffers(0, 1, &m_boundVertexBuffer.view);
+    m_commandList->IASetIndexBuffer(&m_boundIndexBuffer.view);
     m_commandList->DrawIndexedInstanced(indexCount, 1, 0, 0, 0);
 
     m_boundVertexBuffer = {};
@@ -507,9 +506,23 @@ void EfgInternal::WaitForPreviousFrame()
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 }
 
-ComPtr<ID3D12Resource> EfgInternal::CreateBufferResource(D3D12_HEAP_TYPE cpuAccess, D3D12_RESOURCE_STATES resourceState, UINT size)
+ComPtr<ID3D12Resource> EfgInternal::CreateBufferResource(EFG_CPU_ACCESS cpuAccess, UINT size)
 {
     ComPtr<ID3D12Resource> resource = {};
+    D3D12_HEAP_TYPE heapType;
+    D3D12_RESOURCE_STATES resourceState;
+
+    switch (cpuAccess)
+    {
+    case EFG_CPU_NONE:
+        heapType = D3D12_HEAP_TYPE_DEFAULT;
+        resourceState = D3D12_RESOURCE_STATE_COPY_DEST;
+        break;
+    case EFG_CPU_WRITE:
+        heapType = D3D12_HEAP_TYPE_UPLOAD;
+        resourceState = D3D12_RESOURCE_STATE_GENERIC_READ;
+        break;
+    }
 
     D3D12_RESOURCE_DESC resourceDesc = {};
     resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -521,7 +534,7 @@ ComPtr<ID3D12Resource> EfgInternal::CreateBufferResource(D3D12_HEAP_TYPE cpuAcce
     resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
     D3D12_HEAP_PROPERTIES heapProps = {};
-    heapProps.Type = cpuAccess;
+    heapProps.Type = heapType;
     heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
     heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
     heapProps.CreationNodeMask = 1;
@@ -539,77 +552,28 @@ ComPtr<ID3D12Resource> EfgInternal::CreateBufferResource(D3D12_HEAP_TYPE cpuAcce
     return resource;
 }
 
-EfgBuffer EfgInternal::CreateBuffer(EFG_BUFFER_TYPE bufferType, void const* data, UINT size)
+void EfgInternal::CreateBuffer(void const* data, EfgBuffer& buffer, EFG_CPU_ACCESS cpuAccess)
 {
-    EfgBuffer buffer = { };
-    UINT alignmentSize = size;
-    D3D12_HEAP_TYPE cpuAccess = D3D12_HEAP_TYPE_DEFAULT;
-    D3D12_RESOURCE_STATES resourceState = D3D12_RESOURCE_STATE_COPY_DEST;
     ComPtr<ID3D12Resource> uploadResource;
 
-    if(bufferType == EFG_CONSTANT_BUFFER)
-    {
-        cpuAccess = D3D12_HEAP_TYPE_UPLOAD;
-        resourceState = D3D12_RESOURCE_STATE_GENERIC_READ;
-        alignmentSize = (size + 255) & ~255; // CB size must be a multiple of 256 bytes.
-    }
+    buffer.m_bufferResource = CreateBufferResource(cpuAccess, buffer.alignmentSize);
 
-    buffer.m_bufferResource = CreateBufferResource(cpuAccess, resourceState, alignmentSize);
-
-    if (cpuAccess != D3D12_HEAP_TYPE_UPLOAD)
-        uploadResource = CreateBufferResource(D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_GENERIC_READ, alignmentSize);
+    if (cpuAccess != EFG_CPU_WRITE)
+        uploadResource = CreateBufferResource(EFG_CPU_WRITE, buffer.alignmentSize);
     else
         uploadResource = buffer.m_bufferResource;
     
-    // Copy the triangle data to the vertex buffer.
     void* mappedData;
     CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
     ThrowIfFailed(uploadResource->Map(0, &readRange, &mappedData));
-    memcpy(mappedData, data, size);
+    memcpy(mappedData, data, buffer.size);
     uploadResource->Unmap(0, nullptr);
-    buffer.m_size = size;
-    buffer.type = bufferType;
 
-    switch (bufferType)
-    {
-    case EFG_VERTEX_BUFFER:
-        {
-            D3D12_VERTEX_BUFFER_VIEW* view = new D3D12_VERTEX_BUFFER_VIEW;
-            view->BufferLocation = buffer.m_bufferResource->GetGPUVirtualAddress();
-            view->StrideInBytes = sizeof(Vertex);
-            view->SizeInBytes = buffer.m_size;
-            buffer.viewHandle = reinterpret_cast<uint64_t>(view); 
-            break;
-        }
-    case EFG_INDEX_BUFFER:
-        {
-            D3D12_INDEX_BUFFER_VIEW* view = new D3D12_INDEX_BUFFER_VIEW;
-            view->BufferLocation = buffer.m_bufferResource->GetGPUVirtualAddress();
-            view->Format = DXGI_FORMAT_R32_UINT;
-            view->SizeInBytes = buffer.m_size;
-            buffer.viewHandle = reinterpret_cast<uint64_t>(view); 
-            break;
-        }
-    case EFG_CONSTANT_BUFFER:
-        {
-            CD3DX12_CPU_DESCRIPTOR_HANDLE cbvHandle(m_cbvHeap->GetCPUDescriptorHandleForHeapStart());
-            cbvHandle.Offset(m_cbvDescriptorCount, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
-
-            D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-            cbvDesc.BufferLocation = buffer.m_bufferResource->GetGPUVirtualAddress();
-            cbvDesc.SizeInBytes = alignmentSize; // CB size must be a multiple of 256 bytes.
-            m_device->CreateConstantBufferView(&cbvDesc, cbvHandle);
-            m_cbvDescriptorCount++;
-            buffer.viewHandle = reinterpret_cast<uint64_t>(&cbvHandle);
-            break;
-        }
-    };
-
-    if (cpuAccess != D3D12_HEAP_TYPE_UPLOAD)
+    if (cpuAccess != EFG_CPU_WRITE)
     {
         ResetCommandList();
 
-        m_commandList->CopyBufferRegion(buffer.m_bufferResource.Get(), 0, uploadResource.Get(), 0, alignmentSize);
+        m_commandList->CopyBufferRegion(buffer.m_bufferResource.Get(), 0, uploadResource.Get(), 0, buffer.alignmentSize);
 
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -627,6 +591,57 @@ EfgBuffer EfgInternal::CreateBuffer(EFG_BUFFER_TYPE bufferType, void const* data
 
         WaitForGpu();
     }
+}
+
+EfgVertexBuffer EfgInternal::CreateVertexBuffer(void const* data, UINT size)
+{
+    EfgVertexBuffer buffer = { };
+
+    buffer.size = size;
+    buffer.alignmentSize = size;
+    buffer.type = EFG_VERTEX_BUFFER;
+    CreateBuffer(data, buffer, EFG_CPU_NONE);
+
+    buffer.view.BufferLocation = buffer.m_bufferResource->GetGPUVirtualAddress();
+    buffer.view.StrideInBytes = sizeof(Vertex);
+    buffer.view.SizeInBytes = buffer.size;
+
+    return buffer;
+}
+
+EfgIndexBuffer EfgInternal::CreateIndexBuffer(void const* data, UINT size)
+{
+    EfgIndexBuffer buffer = { };
+
+    buffer.size = size;
+    buffer.alignmentSize = size;
+    buffer.type = EFG_INDEX_BUFFER;
+    CreateBuffer(data, buffer, EFG_CPU_NONE);
+
+    buffer.view.BufferLocation = buffer.m_bufferResource->GetGPUVirtualAddress();
+    buffer.view.Format = DXGI_FORMAT_R32_UINT;
+    buffer.view.SizeInBytes = buffer.size;
+
+    return buffer;
+}
+
+EfgConstantBuffer EfgInternal::CreateConstantBuffer(void const* data, UINT size)
+{
+    EfgConstantBuffer buffer = { };
+
+    buffer.size = size;
+    buffer.alignmentSize = (size + 255) & ~255; // CB size must be a multiple of 256 bytes.
+    buffer.type = EFG_CONSTANT_BUFFER;
+    CreateBuffer(data, buffer, EFG_CPU_WRITE);
+
+    buffer.cbvHandle = m_cbvHeap->GetCPUDescriptorHandleForHeapStart();
+    buffer.cbvHandle.Offset(m_cbvDescriptorCount, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
+
+    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+    cbvDesc.BufferLocation = buffer.m_bufferResource->GetGPUVirtualAddress();
+    cbvDesc.SizeInBytes = buffer.alignmentSize;
+    m_device->CreateConstantBufferView(&cbvDesc, buffer.cbvHandle);
+    m_cbvDescriptorCount++;
 
     return buffer;
 }
@@ -657,13 +672,13 @@ EfgProgram EfgInternal::CreateProgram(LPCWSTR fileName)
 {
     EfgProgram program = {};
     program.source = GetAssetFullPath(fileName);
+    CompileProgram(program);
     return program;
 }
 
 EfgPSO EfgInternal::CreateGraphicsPipelineState(EfgProgram program)
 {
     EfgPSO pso = {};
-    CompileProgram(program);
 
     // Create an empty root signature.
     {
@@ -706,12 +721,12 @@ void EfgInternal::SetPipelineState(EfgPSO pso)
     m_boundPSO = pso;
 }
 
-void EfgInternal::bindVertexBuffer(EfgBuffer buffer)
+void EfgInternal::BindVertexBuffer(EfgVertexBuffer buffer)
 {
     m_boundVertexBuffer = buffer;
 }
 
-void EfgInternal::bindIndexBuffer(EfgBuffer buffer)
+void EfgInternal::BindIndexBuffer(EfgIndexBuffer buffer)
 {
 
     m_boundIndexBuffer = buffer;

@@ -562,10 +562,10 @@ EfgBuffer EfgInternal::CreateBuffer(EFG_BUFFER_TYPE bufferType, void const* data
         uploadResource = buffer.m_bufferResource;
     
     // Copy the triangle data to the vertex buffer.
-    UINT8* pVertexDataBegin;
+    void* mappedData;
     CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
-    ThrowIfFailed(uploadResource->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
-    memcpy(pVertexDataBegin, data, size);
+    ThrowIfFailed(uploadResource->Map(0, &readRange, &mappedData));
+    memcpy(mappedData, data, size);
     uploadResource->Unmap(0, nullptr);
     buffer.m_size = size;
     buffer.type = bufferType;
@@ -607,9 +607,7 @@ EfgBuffer EfgInternal::CreateBuffer(EFG_BUFFER_TYPE bufferType, void const* data
 
     if (cpuAccess != D3D12_HEAP_TYPE_UPLOAD)
     {
-        // Reset the command list before recording new commands.
-        ThrowIfFailed(m_commandAllocator->Reset());
-        ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), nullptr));
+        ResetCommandList();
 
         m_commandList->CopyBufferRegion(buffer.m_bufferResource.Get(), 0, uploadResource.Get(), 0, alignmentSize);
 
@@ -627,18 +625,32 @@ EfgBuffer EfgInternal::CreateBuffer(EFG_BUFFER_TYPE bufferType, void const* data
         ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
         m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
-        m_fenceValue++;
-        m_commandQueue->Signal(m_fence.Get(), m_fenceValue);
-        if (m_fence->GetCompletedValue() < m_fenceValue)
-        {
-            HANDLE eventHandle = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
-            m_fence->SetEventOnCompletion(m_fenceValue, eventHandle);
-            WaitForSingleObject(eventHandle, INFINITE);
-            CloseHandle(eventHandle);
-        }
+        WaitForGpu();
     }
 
     return buffer;
+}
+
+void EfgInternal::WaitForGpu()
+{
+    m_fenceValue++;
+    m_commandQueue->Signal(m_fence.Get(), m_fenceValue);
+    if (m_fence->GetCompletedValue() < m_fenceValue)
+    {
+        HANDLE eventHandle = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
+        if (eventHandle == NULL)
+            ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError()));
+        ThrowIfFailed(m_fence->SetEventOnCompletion(m_fenceValue, eventHandle));
+        WaitForSingleObject(eventHandle, INFINITE);
+        CloseHandle(eventHandle);
+    }
+}
+
+void EfgInternal::ResetCommandList()
+{
+    // Reset the command list before recording new commands.
+    ThrowIfFailed(m_commandAllocator->Reset());
+    ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), nullptr));
 }
 
 EfgProgram EfgInternal::CreateProgram(LPCWSTR fileName)

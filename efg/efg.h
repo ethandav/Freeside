@@ -121,6 +121,7 @@ private:
     void CreateRootSignature(uint32_t numDescriptors);
     void bindCBVDescriptorHeaps();
     void ResetCommandList();
+    void ExecuteCommandList();
     void WaitForGpu();
     void CreateBuffer(void const* data, EfgBuffer& buffer, EFG_CPU_ACCESS cpuAccess);
     ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type);

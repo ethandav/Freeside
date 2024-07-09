@@ -365,16 +365,21 @@ void EfgInternal::Render()
 {
     // Indicate that the back buffer will now be used to present.
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
-    ThrowIfFailed(m_commandList->Close());
 
-    // Execute the command list.
-    ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
-    m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+    ExecuteCommandList();
 
     // Present the frame.
     ThrowIfFailed(m_swapChain->Present(1, 0));
 
     WaitForPreviousFrame();
+}
+
+void EfgInternal::ExecuteCommandList()
+{
+    // Execute the command list.
+    ThrowIfFailed(m_commandList->Close());
+    ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
+    m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 }
 
 void EfgInternal::createCBVDescriptorHeap(uint32_t numDescriptors)
@@ -509,15 +514,11 @@ void EfgInternal::WaitForPreviousFrame()
 ComPtr<ID3D12Resource> EfgInternal::CreateBufferResource(EFG_CPU_ACCESS cpuAccess, UINT size)
 {
     ComPtr<ID3D12Resource> resource = {};
-    D3D12_HEAP_TYPE heapType;
-    D3D12_RESOURCE_STATES resourceState;
+    D3D12_HEAP_TYPE heapType = D3D12_HEAP_TYPE_DEFAULT;
+    D3D12_RESOURCE_STATES resourceState = D3D12_RESOURCE_STATE_COPY_DEST;
 
     switch (cpuAccess)
     {
-    case EFG_CPU_NONE:
-        heapType = D3D12_HEAP_TYPE_DEFAULT;
-        resourceState = D3D12_RESOURCE_STATE_COPY_DEST;
-        break;
     case EFG_CPU_WRITE:
         heapType = D3D12_HEAP_TYPE_UPLOAD;
         resourceState = D3D12_RESOURCE_STATE_GENERIC_READ;
@@ -585,9 +586,7 @@ void EfgInternal::CreateBuffer(void const* data, EfgBuffer& buffer, EFG_CPU_ACCE
 
         m_commandList->ResourceBarrier(1, &barrier);
         
-        m_commandList->Close();
-        ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
-        m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+        ExecuteCommandList();
 
         WaitForGpu();
     }

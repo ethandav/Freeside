@@ -54,10 +54,10 @@ int main()
     // Define the geometry for a square
     Vertex squareVertices[] =
     {
-        { { -0.5f,  0.5f * aspectRatio, 0.0f }, { 0.0f, 0.2f, 0.4f, 1.0f } },
-        { {  0.5f,  0.5f * aspectRatio, 0.0f }, { 0.0f, 0.2f, 0.4f, 1.0f } },
-        { {  0.5f, -0.5f * aspectRatio, 0.0f }, { 0.0f, 0.2f, 0.4f, 1.0f } },
-        { { -0.5f, -0.5f * aspectRatio, 0.0f }, { 0.0f, 0.2f, 0.4f, 1.0f } }
+        { { -0.5f,  0.5f, 0.0f }, { 0.0f, 0.2f, 0.4f, 1.0f } },
+        { {  0.5f,  0.5f, 0.0f }, { 0.0f, 0.2f, 0.4f, 1.0f } },
+        { {  0.5f, -0.5f, 0.0f }, { 0.0f, 0.2f, 0.4f, 1.0f } },
+        { { -0.5f, -0.5f, 0.0f }, { 0.0f, 0.2f, 0.4f, 1.0f } }
     };
 
     uint32_t squareIndices[] =
@@ -83,13 +83,9 @@ int main()
 
     efgCreateCBVDescriptorHeap(efg, 2);
 
-    int test = 1;
-
-    //EfgBuffer vertexBuffer = efgCreateBuffer<Vertex>(efg, triangleVertices, sizeof(triangleVertices), 3);
     EfgVertexBuffer vertexBuffer = efgCreateVertexBuffer<Vertex>(efg, squareVertices, sizeof(squareVertices), 4);
     EfgIndexBuffer indexBuffer = efgCreateIndexBuffer<uint32_t>(efg, squareIndices, sizeof(squareIndices), 6);
     EfgConstantBuffer constantBuffer = efgCreateConstantBuffer<XMMATRIX>(efg, &viewProjectionMatrix, sizeof(viewProjectionMatrix), 1);
-    EfgConstantBuffer constantBuffer2 = efgCreateConstantBuffer<int>(efg, &test, sizeof(test), 1);
 
     EfgProgram program = efgCreateProgram(efg, L"shaders.hlsl");
     EfgPSO pso = efgCreateGraphicsPipelineState(efg, program);

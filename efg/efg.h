@@ -123,10 +123,11 @@ private:
     void ResetCommandList();
     void ExecuteCommandList();
     void WaitForGpu();
-    void CreateBuffer(void const* data, EfgBuffer& buffer, EFG_CPU_ACCESS cpuAccess);
-    void CopyResourceToBuffer(EfgBuffer dest, ComPtr<ID3D12Resource> src);
+    void CreateBuffer(void const* data, EfgBuffer& buffer, EFG_CPU_ACCESS cpuAccess, D3D12_RESOURCE_STATES finalState);
+    void CopyBuffer(ComPtr<ID3D12Resource> dest, ComPtr<ID3D12Resource> src, UINT size, D3D12_RESOURCE_STATES current, D3D12_RESOURCE_STATES final);
     ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type);
     ComPtr<ID3D12Resource> CreateBufferResource(EFG_CPU_ACCESS cpuAccess, UINT size);
+    void TransitionResourceState(ComPtr<ID3D12Resource>& resource, D3D12_RESOURCE_STATES currentState, D3D12_RESOURCE_STATES newState);
 
 	HWND window_ = {};
     static const UINT FrameCount = 2;

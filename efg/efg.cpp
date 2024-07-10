@@ -515,7 +515,7 @@ ComPtr<ID3D12Resource> EfgInternal::CreateBufferResource(EFG_CPU_ACCESS cpuAcces
 {
     ComPtr<ID3D12Resource> resource = {};
     D3D12_HEAP_TYPE heapType = D3D12_HEAP_TYPE_DEFAULT;
-    D3D12_RESOURCE_STATES resourceState = D3D12_RESOURCE_STATE_COPY_DEST;
+    D3D12_RESOURCE_STATES resourceState = D3D12_RESOURCE_STATE_COMMON;
 
     switch (cpuAccess)
     {
@@ -553,42 +553,53 @@ ComPtr<ID3D12Resource> EfgInternal::CreateBufferResource(EFG_CPU_ACCESS cpuAcces
     return resource;
 }
 
-void EfgInternal::CreateBuffer(void const* data, EfgBuffer& buffer, EFG_CPU_ACCESS cpuAccess)
+void EfgInternal::CreateBuffer(void const* data, EfgBuffer& buffer, EFG_CPU_ACCESS cpuAccess, D3D12_RESOURCE_STATES finalState)
 {
-    ComPtr<ID3D12Resource> uploadResource;
-
-    buffer.m_bufferResource = CreateBufferResource(cpuAccess, buffer.alignmentSize);
-
-    if (cpuAccess != EFG_CPU_WRITE)
-        uploadResource = CreateBufferResource(EFG_CPU_WRITE, buffer.alignmentSize);
-    else
-        uploadResource = buffer.m_bufferResource;
+    ComPtr<ID3D12Resource> uploadBuffer = CreateBufferResource(EFG_CPU_WRITE, buffer.alignmentSize);
     
     void* mappedData;
-    CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
-    ThrowIfFailed(uploadResource->Map(0, &readRange, &mappedData));
+    CD3DX12_RANGE readRange(0, 0);
+    ThrowIfFailed(uploadBuffer->Map(0, &readRange, &mappedData));
     memcpy(mappedData, data, buffer.size);
-    uploadResource->Unmap(0, nullptr);
 
-    if (cpuAccess != EFG_CPU_WRITE)
-        CopyResourceToBuffer(buffer, uploadResource);
+    switch(cpuAccess)
+    {
+    case EFG_CPU_NONE:
+        uploadBuffer->Unmap(0, nullptr);
+        buffer.m_bufferResource = CreateBufferResource(cpuAccess, buffer.size);
+        CopyBuffer(buffer.m_bufferResource, uploadBuffer, buffer.alignmentSize, D3D12_RESOURCE_STATE_COMMON, finalState);
+        break;
+    case EFG_CPU_WRITE:
+        CD3DX12_RANGE writeRange(0, buffer.alignmentSize);
+        uploadBuffer->Unmap(0, &writeRange);
+        buffer.m_bufferResource = uploadBuffer;
+        break;
+    }
 }
 
-void EfgInternal::CopyResourceToBuffer(EfgBuffer dest, ComPtr<ID3D12Resource> src)
+void EfgInternal::TransitionResourceState(ComPtr<ID3D12Resource>& resource, D3D12_RESOURCE_STATES currentState, D3D12_RESOURCE_STATES finalState)
+{
+    if (currentState != finalState)
+    {
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+        barrier.Transition.pResource = resource.Get();
+        barrier.Transition.StateBefore = currentState;
+        barrier.Transition.StateAfter = finalState;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        
+        m_commandList->ResourceBarrier(1, &barrier);
+    }
+}
+
+void EfgInternal::CopyBuffer(ComPtr<ID3D12Resource> dest, ComPtr<ID3D12Resource> src, UINT size, D3D12_RESOURCE_STATES currentState, D3D12_RESOURCE_STATES finalState)
 {
     ResetCommandList();
     
-    m_commandList->CopyBufferRegion(dest.m_bufferResource.Get(), 0, src.Get(), 0, dest.alignmentSize);
-    
-    D3D12_RESOURCE_BARRIER barrier = {};
-    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-    barrier.Transition.pResource = dest.m_bufferResource.Get();
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    
-    m_commandList->ResourceBarrier(1, &barrier);
+    TransitionResourceState(dest, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
+    m_commandList->CopyBufferRegion(dest.Get(), 0, src.Get(), 0, size);
+    TransitionResourceState(dest, D3D12_RESOURCE_STATE_COPY_DEST, finalState);
 
     ExecuteCommandList();
     WaitForGpu();
@@ -601,7 +612,7 @@ EfgVertexBuffer EfgInternal::CreateVertexBuffer(void const* data, UINT size)
     buffer.size = size;
     buffer.alignmentSize = size;
     buffer.type = EFG_VERTEX_BUFFER;
-    CreateBuffer(data, buffer, EFG_CPU_NONE);
+    CreateBuffer(data, buffer, EFG_CPU_NONE, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 
     buffer.view.BufferLocation = buffer.m_bufferResource->GetGPUVirtualAddress();
     buffer.view.StrideInBytes = sizeof(Vertex);
@@ -617,7 +628,7 @@ EfgIndexBuffer EfgInternal::CreateIndexBuffer(void const* data, UINT size)
     buffer.size = size;
     buffer.alignmentSize = size;
     buffer.type = EFG_INDEX_BUFFER;
-    CreateBuffer(data, buffer, EFG_CPU_NONE);
+    CreateBuffer(data, buffer, EFG_CPU_NONE, D3D12_RESOURCE_STATE_INDEX_BUFFER);
 
     buffer.view.BufferLocation = buffer.m_bufferResource->GetGPUVirtualAddress();
     buffer.view.Format = DXGI_FORMAT_R32_UINT;
@@ -633,7 +644,7 @@ EfgConstantBuffer EfgInternal::CreateConstantBuffer(void const* data, UINT size)
     buffer.size = size;
     buffer.alignmentSize = (size + 255) & ~255; // CB size must be a multiple of 256 bytes.
     buffer.type = EFG_CONSTANT_BUFFER;
-    CreateBuffer(data, buffer, EFG_CPU_WRITE);
+    CreateBuffer(data, buffer, EFG_CPU_WRITE, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 
     buffer.cbvHandle = m_cbvHeap->GetCPUDescriptorHandleForHeapStart();
     buffer.cbvHandle.Offset(m_cbvDescriptorCount, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));

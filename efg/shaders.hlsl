@@ -33,6 +33,8 @@ PSInput VSMain(VSInput input)
     PSInput result;
 
     result.position = mul(input.position, viewProjectionMatrix);
+    result.normal = input.normal;
+    result.uv = input.uv;
 
     return result;
 }

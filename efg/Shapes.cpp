@@ -320,31 +320,30 @@ Shape skybox()
     return skybox;
 }
 
-Shape sphere()
+Shape sphere(float diameter = 1.0f)
 {
     Shape sphere;
-    sphere.indexCount = 5000;
-    sphere.vertexCount = 1000;
-
     size_t tessellation = 20;
 
     const size_t verticalSegments = tessellation;
     const size_t horizontalSegments = tessellation * 2;
 
-    sphere.vertices.reserve(verticalSegments * horizontalSegments);
+    sphere.vertexCount = (verticalSegments + 1) * (horizontalSegments + 1);
+    sphere.indexCount = verticalSegments * horizontalSegments * 6;
 
-    float diameter = 2;
-    const float radius = diameter / 2;
+    sphere.vertices.reserve(sphere.vertexCount);
+    sphere.indices.reserve(sphere.indexCount);
+
+    const float radius = diameter / 2.0f;
 
     for (size_t i = 0; i <= verticalSegments; i++)
     {
-        const float v = 1 - float(i) / float(verticalSegments);
+        const float v = 1.0f - float(i) / float(verticalSegments);
 
         const float latitude = (float(i) * XM_PI / float(verticalSegments)) - XM_PIDIV2;
         float dy, dxz;
 
-        dy = sinf(latitude);
-        dxz = cosf(latitude);
+        XMScalarSinCos(&dy, &dxz, latitude);
 
         for (size_t j = 0; j <= horizontalSegments; j++)
         {
@@ -353,8 +352,7 @@ Shape sphere()
             const float longitude = float(j) * XM_2PI / float(horizontalSegments);
             float dx, dz;
 
-            dx = sinf(longitude);
-            dz = cosf(longitude);
+            XMScalarSinCos(&dx, &dz, longitude);
 
             dx *= dxz;
             dz *= dxz;
@@ -378,18 +376,19 @@ Shape sphere()
 
     for (size_t i = 0; i < verticalSegments; i++)
     {
-        for (size_t j = 0; j <= horizontalSegments; j++)
+        for (size_t j = 0; j < horizontalSegments; j++)
         {
             const size_t nextI = i + 1;
             const size_t nextJ = (j + 1) % stride;
 
+            // Correct winding for counter-clockwise order
             sphere.indices.push_back(i * stride + j);
-            sphere.indices.push_back(i * stride + nextJ);
             sphere.indices.push_back(nextI * stride + j);
+            sphere.indices.push_back(i * stride + nextJ);
 
             sphere.indices.push_back(i * stride + nextJ);
-            sphere.indices.push_back(nextI * stride + nextJ);
             sphere.indices.push_back(nextI * stride + j);
+            sphere.indices.push_back(nextI * stride + nextJ);
         }
     }
 

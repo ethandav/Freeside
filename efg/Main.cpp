@@ -45,7 +45,7 @@ int main()
 
     float aspectRatio = static_cast<float>(1920) / static_cast<float>(1080);
 
-    Shape square = Shapes::getShape(Shapes::SQUARE);
+    Shape square = Shapes::getShape(Shapes::SPHERE);
 
     // View matrix
     DirectX::XMVECTOR eyePosition = DirectX::XMVectorSet(0.0f, 0.0f, -5.0f, 0.0f);
@@ -77,7 +77,7 @@ int main()
         efgBindVertexBuffer(efg, vertexBuffer);
         efgBindIndexBuffer(efg, indexBuffer);
         efgSetPipelineState(efg, pso);
-        efgDrawIndexedInstanced(efg, 6);
+        efgDrawIndexedInstanced(efg, square.indexCount);
         efgRender(efg);
     }
 

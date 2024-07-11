@@ -13,19 +13,15 @@
 #include <wrl.h>
 #include <shellapi.h>
 #include <memory>
+#include <vector>
 
 #include "../DirectX-Headers/include/directx/d3dx12.h"
 #include "DXHelper.h"
 #include "efg_window.h"
+#include "Shapes.h"
 
 using namespace DirectX;
 using Microsoft::WRL::ComPtr;
-
-struct Vertex
-{
-    XMFLOAT3 position;
-    XMFLOAT4 color;
-};
 
 typedef
 enum EFG_BUFFER_TYPE 
@@ -187,21 +183,21 @@ void efgRender(EfgContext efg);
 void efgCreateCBVDescriptorHeap(EfgContext context, uint32_t numDescriptors);
 
 template<typename TYPE>
-EfgVertexBuffer efgCreateVertexBuffer(EfgContext context, void const* data, UINT size, uint32_t count)
+EfgVertexBuffer efgCreateVertexBuffer(EfgContext context, void const* data, uint32_t count)
 {
     EfgVertexBuffer buffer = efgCreateVertexBuffer(context, data, count * sizeof(TYPE));
     return buffer;
 }
 
 template<typename TYPE>
-EfgIndexBuffer efgCreateIndexBuffer(EfgContext context, void const* data, UINT size, uint32_t count)
+EfgIndexBuffer efgCreateIndexBuffer(EfgContext context, void const* data, uint32_t count)
 {
     EfgIndexBuffer buffer = efgCreateIndexBuffer(context, data, count * sizeof(TYPE));
     return buffer;
 }
 
 template<typename TYPE>
-EfgConstantBuffer efgCreateConstantBuffer(EfgContext context, void const* data, UINT size, uint32_t count)
+EfgConstantBuffer efgCreateConstantBuffer(EfgContext context, void const* data, uint32_t count)
 {
     EfgConstantBuffer buffer = efgCreateConstantBuffer(context, data, count * sizeof(TYPE));
     return buffer;

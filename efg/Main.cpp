@@ -2,6 +2,8 @@
 #include <filesystem>
 #include <shlobj.h>
 
+#include "Shapes.h"
+
 static std::wstring GetLatestWinPixGpuCapturerPath_Cpp17()
 {
     LPWSTR programFilesPath = nullptr;
@@ -43,28 +45,7 @@ int main()
 
     float aspectRatio = static_cast<float>(1920) / static_cast<float>(1080);
 
-    // Define the geometry for a triangle.
-    Vertex triangleVertices[] =
-    {
-        { { 0.0f, 0.25f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-        { { 0.25f, -0.25f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-        { { -0.25f, -0.25f, 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-    };
-
-    // Define the geometry for a square
-    Vertex squareVertices[] =
-    {
-        { { -0.5f,  0.5f, 0.0f }, { 0.0f, 0.2f, 0.4f, 1.0f } },
-        { {  0.5f,  0.5f, 0.0f }, { 0.0f, 0.2f, 0.4f, 1.0f } },
-        { {  0.5f, -0.5f, 0.0f }, { 0.0f, 0.2f, 0.4f, 1.0f } },
-        { { -0.5f, -0.5f, 0.0f }, { 0.0f, 0.2f, 0.4f, 1.0f } }
-    };
-
-    uint32_t squareIndices[] =
-    {
-        0, 1, 2,
-        0, 2, 3
-    };
+    Shape square = Shapes::getShape(Shapes::SQUARE);
 
     // View matrix
     DirectX::XMVECTOR eyePosition = DirectX::XMVectorSet(0.0f, 0.0f, -5.0f, 0.0f);
@@ -83,9 +64,9 @@ int main()
 
     efgCreateCBVDescriptorHeap(efg, 2);
 
-    EfgVertexBuffer vertexBuffer = efgCreateVertexBuffer<Vertex>(efg, squareVertices, sizeof(squareVertices), 4);
-    EfgIndexBuffer indexBuffer = efgCreateIndexBuffer<uint32_t>(efg, squareIndices, sizeof(squareIndices), 6);
-    EfgConstantBuffer constantBuffer = efgCreateConstantBuffer<XMMATRIX>(efg, &viewProjectionMatrix, sizeof(viewProjectionMatrix), 1);
+    EfgVertexBuffer vertexBuffer = efgCreateVertexBuffer<Vertex>(efg, square.vertices.data(), square.vertexCount);
+    EfgIndexBuffer indexBuffer = efgCreateIndexBuffer<uint32_t>(efg, square.indices.data(), square.indexCount);
+    EfgConstantBuffer constantBuffer = efgCreateConstantBuffer<XMMATRIX>(efg, &viewProjectionMatrix, 1);
 
     EfgProgram program = efgCreateProgram(efg, L"shaders.hlsl");
     EfgPSO pso = efgCreateGraphicsPipelineState(efg, program);

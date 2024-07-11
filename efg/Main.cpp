@@ -3,6 +3,7 @@
 #include <shlobj.h>
 
 #include "Shapes.h"
+#include "efg_camera.h"
 
 static std::wstring GetLatestWinPixGpuCapturerPath_Cpp17()
 {
@@ -42,37 +43,22 @@ int main()
 
     EfgWindow efgWindow = efgCreateWindow(1920, 1080, L"New Window");
     EfgContext efg = efgCreateContext(efgWindow);
-
-    float aspectRatio = static_cast<float>(1920) / static_cast<float>(1080);
+    Camera camera = efgCreateCamera(efg, DirectX::XMFLOAT3(0.0f, 0.0f, -5.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f));
 
     Shape square = Shapes::getShape(Shapes::SPHERE);
-
-    // View matrix
-    DirectX::XMVECTOR eyePosition = DirectX::XMVectorSet(0.0f, 0.0f, -5.0f, 0.0f);
-    DirectX::XMVECTOR focusPoint = DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
-    DirectX::XMVECTOR upDirection = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-    DirectX::XMMATRIX viewMatrix = DirectX::XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
-
-    // Projection matrix
-    float fieldOfView = DirectX::XMConvertToRadians(45.0f);
-    float nearZ = 0.1f;
-    float farZ = 100.0f;
-    DirectX::XMMATRIX projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(fieldOfView, aspectRatio, nearZ, farZ);
-
-    // View-Projection matrix
-    DirectX::XMMATRIX viewProjectionMatrix = viewMatrix * projectionMatrix;
 
     efgCreateCBVDescriptorHeap(efg, 2);
 
     EfgVertexBuffer vertexBuffer = efgCreateVertexBuffer<Vertex>(efg, square.vertices.data(), square.vertexCount);
     EfgIndexBuffer indexBuffer = efgCreateIndexBuffer<uint32_t>(efg, square.indices.data(), square.indexCount);
-    EfgConstantBuffer constantBuffer = efgCreateConstantBuffer<XMMATRIX>(efg, &viewProjectionMatrix, 1);
+    EfgConstantBuffer constantBuffer = efgCreateConstantBuffer<XMMATRIX>(efg, &camera.viewProj, 1);
 
     EfgProgram program = efgCreateProgram(efg, L"shaders.hlsl");
     EfgPSO pso = efgCreateGraphicsPipelineState(efg, program);
 
     while (efgWindowIsRunning(efgWindow))
     {
+        efgUpdateCamera(efg, efgWindow, camera);
         efgWindowPumpEvents(efgWindow);
         efgBindVertexBuffer(efg, vertexBuffer);
         efgBindIndexBuffer(efg, indexBuffer);

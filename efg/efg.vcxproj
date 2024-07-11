@@ -133,6 +133,7 @@
   <ItemGroup>
     <ClInclude Include="DXHelper.h" />
     <ClInclude Include="efg.h" />
+    <ClInclude Include="efg_camera.h" />
     <ClInclude Include="efg_window.h" />
     <ClInclude Include="Shapes.h" />
   </ItemGroup>
@@ -140,6 +141,7 @@
     <ClCompile Include="efg.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="efg_camera.cpp" />
     <ClCompile Include="efg_window.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>

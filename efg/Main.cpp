@@ -46,12 +46,14 @@ int main()
     Camera camera = efgCreateCamera(efg, DirectX::XMFLOAT3(0.0f, 0.0f, -5.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f));
 
     Shape square = Shapes::getShape(Shapes::SPHERE);
+    XMMATRIX transformMatrix = efgCreateTransformMatrix(XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f));
 
     efgCreateCBVDescriptorHeap(efg, 2);
 
     EfgVertexBuffer vertexBuffer = efgCreateVertexBuffer<Vertex>(efg, square.vertices.data(), square.vertexCount);
     EfgIndexBuffer indexBuffer = efgCreateIndexBuffer<uint32_t>(efg, square.indices.data(), square.indexCount);
-    EfgConstantBuffer constantBuffer = efgCreateConstantBuffer<XMMATRIX>(efg, &camera.viewProj, 1);
+    EfgConstantBuffer viewProjBuffer = efgCreateConstantBuffer<XMMATRIX>(efg, &camera.viewProj, 1);
+    EfgConstantBuffer transformBuffer = efgCreateConstantBuffer<XMMATRIX>(efg, &transformMatrix, 1);
 
     EfgProgram program = efgCreateProgram(efg, L"shaders.hlsl");
     EfgPSO pso = efgCreateGraphicsPipelineState(efg, program);
@@ -59,7 +61,7 @@ int main()
     while (efgWindowIsRunning(efgWindow))
     {
         efgUpdateCamera(efg, efgWindow, camera);
-        efgUpdateConstantBuffer(efg, constantBuffer, &camera.viewProj, sizeof(camera.viewProj));
+        efgUpdateConstantBuffer(efg, viewProjBuffer, &camera.viewProj, sizeof(camera.viewProj));
         efgWindowPumpEvents(efgWindow);
         efgBindVertexBuffer(efg, vertexBuffer);
         efgBindIndexBuffer(efg, indexBuffer);

@@ -93,6 +93,17 @@ void efgDrawIndexedInstanced(EfgContext context, uint32_t indexCount)
     efg->DrawIndexedInstanced(indexCount);
 }
 
+XMMATRIX efgCreateTransformMatrix(XMFLOAT3 translation, XMFLOAT3 rotation, XMFLOAT3 scale)
+{
+    XMVECTOR rotationRadians = XMVectorSet(XMConvertToRadians(rotation.x), XMConvertToRadians(rotation.y), XMConvertToRadians(rotation.z), 0.0f);
+    XMMATRIX translationMatrix = XMMatrixTranslation(translation.x, translation.y, translation.z);
+    XMMATRIX rotationMatrix = XMMatrixRotationRollPitchYaw(rotationRadians.m128_f32[0], rotationRadians.m128_f32[1], rotationRadians.m128_f32[2]);
+    XMMATRIX scalingMatrix = XMMatrixScaling(scale.x, scale.y, scale.z);
+    XMMATRIX modelMatrix = scalingMatrix * rotationMatrix * translationMatrix;
+
+    return modelMatrix;
+}
+
 void EfgInternal::initialize(HWND window)
 {
 	window_ = window;

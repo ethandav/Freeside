@@ -14,6 +14,11 @@ cbuffer ViewProjectionBuffer : register(b0)
     matrix viewProjectionMatrix;
 }
 
+cbuffer TransformBuffer : register(b1)
+{
+    matrix transform;
+}
+
 struct VSInput
 {
     float4 position : POSITION;
@@ -24,6 +29,7 @@ struct VSInput
 struct PSInput
 {
     float4 position : SV_POSITION;
+    float3 fragPos : POSITION;
     float3 normal : NORMAL;
     float2 uv : TEXCOORD;
 };
@@ -31,8 +37,11 @@ struct PSInput
 PSInput VSMain(VSInput input)
 {
     PSInput result;
+    float4 worldPos = mul(transform, input.position);
+    float4 clipPos = mul(viewProjectionMatrix, worldPos);
 
-    result.position = mul(input.position, viewProjectionMatrix);
+    result.position = clipPos;
+    result.fragPos = worldPos.xyz;
     result.normal = input.normal;
     result.uv = input.uv;
 

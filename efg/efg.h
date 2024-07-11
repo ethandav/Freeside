@@ -183,6 +183,7 @@ void efgDrawInstanced(EfgContext efg, uint32_t vertexCount);
 void efgDrawIndexedInstanced(EfgContext efg, uint32_t indexCount);
 void efgRender(EfgContext efg);
 void efgCreateCBVDescriptorHeap(EfgContext context, uint32_t numDescriptors);
+XMMATRIX efgCreateTransformMatrix(XMFLOAT3 translation, XMFLOAT3 rotation, XMFLOAT3 scale);
 
 template<typename TYPE>
 EfgVertexBuffer efgCreateVertexBuffer(EfgContext context, void const* data, uint32_t count)

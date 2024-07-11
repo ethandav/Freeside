@@ -50,7 +50,7 @@ void efgUpdateCamera(EfgContext efg, EfgWindow window, Camera& camera)
     if (rmbDown)
     {
         // Calculate the rotation angles based on mouse movement
-        float yaw = -rotationSpeed * static_cast<float>(mouseX - prevMouseX);
+        float yaw = rotationSpeed * static_cast<float>(mouseX - prevMouseX);
         float pitch = rotationSpeed * static_cast<float>(mouseY - prevMouseY);
 
         float smoothFactor = 0.2f; // Adjust this value for smoother movement
@@ -100,13 +100,13 @@ void efgUpdateCamera(EfgContext efg, EfgWindow window, Camera& camera)
     }
     if (GetAsyncKeyState('A') & 0x8000)
     {
-        eye = XMVectorSubtract(eye, XMVectorScale(right, zoomSpeed));
-        center = XMVectorSubtract(center, XMVectorScale(right, zoomSpeed));
+        eye = XMVectorAdd(eye, XMVectorScale(right, zoomSpeed));
+        center = XMVectorAdd(center, XMVectorScale(right, zoomSpeed));
     }
     if (GetAsyncKeyState('D') & 0x8000)
     {
-        eye = XMVectorAdd(eye, XMVectorScale(right, zoomSpeed));
-        center = XMVectorAdd(center, XMVectorScale(right, zoomSpeed));
+        eye = XMVectorSubtract(eye, XMVectorScale(right, zoomSpeed));
+        center = XMVectorSubtract(center, XMVectorScale(right, zoomSpeed));
     }
 
     XMStoreFloat3(&camera.eye, eye);

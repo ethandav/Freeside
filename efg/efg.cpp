@@ -63,6 +63,12 @@ EfgConstantBuffer efgCreateConstantBuffer(EfgContext context, void const* data, 
     return efg->CreateConstantBuffer(data, size);
 }
 
+void efgUpdateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size)
+{
+    EfgInternal* efg = EfgInternal::GetEfg(context);
+    efg->updateConstantBuffer(buffer, data, size);
+}
+
 void efgBindVertexBuffer(EfgContext context, EfgVertexBuffer buffer)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
@@ -656,6 +662,17 @@ EfgConstantBuffer EfgInternal::CreateConstantBuffer(void const* data, UINT size)
     m_cbvDescriptorCount++;
 
     return buffer;
+}
+
+void EfgInternal::updateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size)
+{
+    void* mappedData = nullptr;
+    D3D12_RANGE readRange = { 0, 0 };
+    D3D12_RANGE writeRange = { 0, size };
+    buffer.m_bufferResource->Map(0, &readRange, &mappedData);
+    if (mappedData)
+        memcpy(mappedData, data, (size_t)size);
+    buffer.m_bufferResource->Unmap(0, &writeRange);
 }
 
 void EfgInternal::WaitForGpu()

@@ -59,6 +59,7 @@ int main()
     while (efgWindowIsRunning(efgWindow))
     {
         efgUpdateCamera(efg, efgWindow, camera);
+        efgUpdateConstantBuffer(efg, constantBuffer, &camera.viewProj, sizeof(camera.viewProj));
         efgWindowPumpEvents(efgWindow);
         efgBindVertexBuffer(efg, vertexBuffer);
         efgBindIndexBuffer(efg, indexBuffer);

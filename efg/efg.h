@@ -94,6 +94,7 @@ public:
     EfgVertexBuffer CreateVertexBuffer(void const* data, UINT size);
     EfgIndexBuffer CreateIndexBuffer(void const* data, UINT size);
     EfgConstantBuffer CreateConstantBuffer(void const* data, UINT size);
+    void updateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size);
     EfgProgram CreateProgram(LPCWSTR fileName);
     EfgPSO CreateGraphicsPipelineState(EfgProgram program);
     void SetPipelineState(EfgPSO pso);
@@ -174,6 +175,7 @@ void efgBindIndexBuffer(EfgContext context, EfgIndexBuffer buffer);
 EfgVertexBuffer efgCreateVertexBuffer(EfgContext context, void const* data, UINT size);
 EfgIndexBuffer efgCreateIndexBuffer(EfgContext context, void const* data, UINT size);
 EfgConstantBuffer efgCreateConstantBuffer(EfgContext context, void const* data, UINT size);
+void efgUpdateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size);
 EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName);
 EfgPSO efgCreateGraphicsPipelineState(EfgContext context, EfgProgram program);
 void efgSetPipelineState(EfgContext efg, EfgPSO pso);

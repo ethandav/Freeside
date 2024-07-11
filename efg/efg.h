@@ -95,17 +95,16 @@ public:
     EfgIndexBuffer CreateIndexBuffer(void const* data, UINT size);
     EfgConstantBuffer CreateConstantBuffer(void const* data, UINT size);
     void updateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size);
-    EfgProgram CreateProgram(LPCWSTR fileName);
-    EfgPSO CreateGraphicsPipelineState(EfgProgram program);
-    void SetPipelineState(EfgPSO pso);
     void BindVertexBuffer(EfgVertexBuffer buffer);
     void BindIndexBuffer(EfgIndexBuffer buffer);
+    EfgProgram CreateProgram(LPCWSTR fileName);
+    EfgPSO CreateGraphicsPipelineState(EfgProgram program);
+    void createCBVDescriptorHeap(uint32_t numDescriptors);
+    void SetPipelineState(EfgPSO pso);
     void DrawInstanced(uint32_t vertexCount);
     void DrawIndexedInstanced(uint32_t indexCount);
     void Render();
-    void createCBVDescriptorHeap(uint32_t numDescriptors);
     void Destroy();
-
 
 private:
     void GetHardwareAdapter(
@@ -113,16 +112,22 @@ private:
         _Outptr_result_maybenull_ IDXGIAdapter1** ppAdapter,
         bool requestHighPerformanceAdapter = false
     );
+    std::wstring GetAssetFullPath(LPCWSTR assetName);
+    void LoadPipeline();
+    void LoadAssets();
+    void WaitForPreviousFrame();
 
     void CompileProgram(EfgProgram& program);
+    ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type);
     void CreateRootSignature(uint32_t numDescriptors);
     void bindCBVDescriptorHeaps();
+
     void ResetCommandList();
     void ExecuteCommandList();
     void WaitForGpu();
+
     void CreateBuffer(void const* data, EfgBuffer& buffer, EFG_CPU_ACCESS cpuAccess, D3D12_RESOURCE_STATES finalState);
     void CopyBuffer(ComPtr<ID3D12Resource> dest, ComPtr<ID3D12Resource> src, UINT size, D3D12_RESOURCE_STATES current, D3D12_RESOURCE_STATES final);
-    ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type);
     ComPtr<ID3D12Resource> CreateBufferResource(EFG_CPU_ACCESS cpuAccess, UINT size);
     void TransitionResourceState(ComPtr<ID3D12Resource>& resource, D3D12_RESOURCE_STATES currentState, D3D12_RESOURCE_STATES newState);
 
@@ -154,19 +159,12 @@ private:
     EfgVertexBuffer m_boundVertexBuffer = {};
     EfgIndexBuffer m_boundIndexBuffer = {};
 
-
     // Synchronization objects.
     UINT m_frameIndex = 0;
     HANDLE m_fenceEvent = 0;
     ComPtr<ID3D12Fence> m_fence;
     UINT64 m_fenceValue = 0;
-
-    std::wstring GetAssetFullPath(LPCWSTR assetName);
-    void LoadPipeline();
-    void LoadAssets();
-    void WaitForPreviousFrame();
 };
-
 
 EfgContext efgCreateContext(HWND window);
 void efgDestroyContext(EfgContext context);

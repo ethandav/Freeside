@@ -1,5 +1,6 @@
 #include "efg_camera.h"
 #include <Windows.h>
+#include <iostream>
 
 // cam speed
 const float rotationSpeed = 0.01f;

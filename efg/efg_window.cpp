@@ -31,10 +31,6 @@ void EfgWindowInternal::pumpEvents()
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
-    else
-    {
-        WaitMessage();
-    }
 }
 
 bool efgWindowIsRunning(EfgWindow window)

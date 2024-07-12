@@ -78,11 +78,16 @@ int main()
         viewPosBuffer,
         materialBuffer;
 
+    EfgStructuredBuffer testBuffer;
+
     efgCreateConstantBuffer<XMMATRIX>(efg, viewProjBuffer, &camera.viewProj, 1);
     efgCreateConstantBuffer<XMMATRIX>(efg, transformBuffer, &transformMatrix, 1);
     efgCreateConstantBuffer<LightBuffer>(efg, lightBuffer, &lightData, 1);
     efgCreateConstantBuffer<XMFLOAT3>(efg, viewPosBuffer, &camera.eye, 1);
     efgCreateConstantBuffer<MaterialBuffer>(efg, materialBuffer, &material, 1);
+
+    std::vector<int> nums = { 1,2 };
+    efgCreateStructuredBuffer<int>(efg, testBuffer, nums.data(), 2);
 
     efgCommitShaderResources(efg);
     EfgProgram program = efgCreateProgram(efg, L"shaders.hlsl");

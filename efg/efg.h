@@ -66,6 +66,8 @@ struct EfgConstantBuffer : public EfgBuffer
 
 struct EfgStructuredBuffer: public EfgBuffer
 {
+    uint32_t count = 0;
+    size_t stride = 0;
     D3D12_SHADER_RESOURCE_VIEW_DESC viewDesc = {};
     CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle = {};
 };
@@ -101,7 +103,7 @@ public:
     EfgVertexBuffer CreateVertexBuffer(void const* data, UINT size);
     EfgIndexBuffer CreateIndexBuffer(void const* data, UINT size);
     void CreateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size);
-    EfgStructuredBuffer CreateStructuredBuffer(void const* data, UINT size, uint32_t numElements);
+    void CreateStructuredBuffer(EfgStructuredBuffer& buffer, void const* data, UINT size, uint32_t numElements, size_t stride);
     void updateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size);
     void BindVertexBuffer(EfgVertexBuffer buffer);
     void BindIndexBuffer(EfgIndexBuffer buffer);
@@ -127,7 +129,7 @@ private:
 
     void CompileProgram(EfgProgram& program);
     ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type);
-    void CreateRootSignature(uint32_t numDescriptors);
+    void CreateRootSignature(uint32_t numCbv, uint32_t numSrv);
     void bindCBVDescriptorHeaps();
 
     void ResetCommandList();
@@ -140,6 +142,7 @@ private:
     void TransitionResourceState(ComPtr<ID3D12Resource>& resource, D3D12_RESOURCE_STATES currentState, D3D12_RESOURCE_STATES newState);
     void CreateCBVDescriptorHeap(uint32_t numDescriptors);
     void CreateConstantBufferView(EfgConstantBuffer* buffer, uint32_t heapOffset);
+    void CreateStructuredBufferView(EfgStructuredBuffer* buffer, uint32_t heapOffset);
 
 	HWND window_ = {};
     static const UINT FrameCount = 2;
@@ -158,16 +161,16 @@ private:
     ComPtr<ID3D12CommandAllocator> m_commandAllocator;
     ComPtr<ID3D12CommandQueue> m_commandQueue;
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-    ComPtr<ID3D12DescriptorHeap> m_cbvHeap;
-    ComPtr<ID3D12DescriptorHeap> m_srvHeap;
+    ComPtr<ID3D12DescriptorHeap> m_cbvSrvHeap;
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
     ComPtr<ID3D12RootSignature> m_rootSignature;
     UINT m_rtvDescriptorSize = 0;
     UINT m_cbvDescriptorSize = 0;
+    UINT m_srvDescriptorSize = 0;
     uint32_t m_cbvDescriptorCount = 0;
     uint32_t m_srvDescriptorCount = 0;
     std::list<EfgConstantBuffer*> m_constantBuffers = {};
-    std::list<EfgConstantBuffer*> m_structuredBuffers = {};
+    std::list<EfgStructuredBuffer*> m_structuredBuffers = {};
 
     EfgPSO m_boundPSO = {};
     EfgVertexBuffer m_boundVertexBuffer = {};
@@ -187,7 +190,7 @@ void efgBindIndexBuffer(EfgContext context, EfgIndexBuffer buffer);
 EfgVertexBuffer efgCreateVertexBuffer(EfgContext context, void const* data, UINT size);
 EfgIndexBuffer efgCreateIndexBuffer(EfgContext context, void const* data, UINT size);
 void efgCreateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size);
-EfgStructuredBuffer efgCreateStructuredBuffer(EfgContext context, void const* data, UINT size, uint32_t count);
+void efgCreateStructuredBuffer(EfgContext context, EfgStructuredBuffer& buffer, void const* data, UINT size, uint32_t count, size_t stride);
 void efgUpdateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size);
 void efgCommitShaderResources(EfgContext context);
 EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName);
@@ -219,8 +222,8 @@ void efgCreateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void
 }
 
 template<typename TYPE>
-EfgStructuredBuffer efgCreateStructuredBuffer(EfgContext context, void const* data, uint32_t count)
+void efgCreateStructuredBuffer(EfgContext context, EfgStructuredBuffer& buffer, void const* data, uint32_t count)
 {
-    EfgStructuredBuffer buffer = efgCreateStructuredBuffer(context, data, count * sizeof(TYPE), count);
-    return buffer;
+    size_t stride = sizeof(TYPE);
+    efgCreateStructuredBuffer(context, buffer, data, count * sizeof(TYPE), count, stride);
 }

@@ -67,6 +67,8 @@ struct PSInput
     float2 uv : TEXCOORD;
 };
 
+StructuredBuffer<int> nums : register(t0);
+
 PSInput VSMain(VSInput input)
 {
     PSInput result;
@@ -109,7 +111,7 @@ float3 calculatePointLight(LightData light, float3 normal, float3 fragPos, float
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
-    float3 normal = normalize(input.normal);
+    float3 normal = normalize(input.normal + nums[0]);
     float3 viewDir = normalize(viewPos - input.fragPos);
     
     float3 color = calculatePointLight(light, normal, input.fragPos, viewDir);

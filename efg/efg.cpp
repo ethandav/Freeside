@@ -60,13 +60,13 @@ EfgIndexBuffer efgCreateIndexBuffer(EfgContext context, void const* data, UINT s
 void efgCreateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
-    return efg->CreateConstantBuffer(buffer, data, size);
+    efg->CreateConstantBuffer(buffer, data, size);
 }
 
-EfgStructuredBuffer efgCreateStructuredBuffer(EfgContext context, void const* data, UINT size, uint32_t count)
+void efgCreateStructuredBuffer(EfgContext context, EfgStructuredBuffer& buffer, void const* data, UINT size, uint32_t count, size_t stride)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
-    return efg->CreateStructuredBuffer(data, size, count);
+    efg->CreateStructuredBuffer(buffer, data, size, count, stride);
 }
 
 void efgUpdateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size)
@@ -316,34 +316,71 @@ ComPtr<ID3D12DescriptorHeap> EfgInternal::CreateDescriptorHeap(uint32_t numDescr
     return heap;
 }
 
-void EfgInternal::CreateRootSignature(uint32_t numDescriptors)
+void EfgInternal::CreateRootSignature(uint32_t numCbv, uint32_t numSrv)
 {
-    // Define a root parameter for the descriptor table
-    D3D12_ROOT_PARAMETER rootParameters[1];
-    rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    rootParameters[0].DescriptorTable.NumDescriptorRanges = 1;
-    rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-    
-    D3D12_DESCRIPTOR_RANGE descriptorRange;
-    descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-    descriptorRange.NumDescriptors = numDescriptors;
-    descriptorRange.BaseShaderRegister = 0;
-    descriptorRange.RegisterSpace = 0;
-    descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-    
-    rootParameters[0].DescriptorTable.pDescriptorRanges = &descriptorRange;
-    
+    std::vector<D3D12_ROOT_PARAMETER> rootParameters;
+    std::vector<D3D12_DESCRIPTOR_RANGE> descriptorRanges;
+    descriptorRanges.reserve(2);
+
+    // Define descriptor range for CBV if needed
+    if (numCbv > 0)
+    {
+        D3D12_DESCRIPTOR_RANGE cbvDescriptorRange = {};
+        cbvDescriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+        cbvDescriptorRange.NumDescriptors = numCbv;
+        cbvDescriptorRange.BaseShaderRegister = 0;
+        cbvDescriptorRange.RegisterSpace = 0;
+        cbvDescriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+        descriptorRanges.push_back(cbvDescriptorRange);
+
+        D3D12_ROOT_PARAMETER cbvRootParameter = {};
+        cbvRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        cbvRootParameter.DescriptorTable.NumDescriptorRanges = 1;
+        cbvRootParameter.DescriptorTable.pDescriptorRanges = &descriptorRanges.back();
+        cbvRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        rootParameters.push_back(cbvRootParameter);
+    }
+
+    // Define descriptor range for SRV if needed
+    if (numSrv > 0)
+    {
+        D3D12_DESCRIPTOR_RANGE srvDescriptorRange = {};
+        srvDescriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        srvDescriptorRange.NumDescriptors = numSrv;
+        srvDescriptorRange.BaseShaderRegister = 0;
+        srvDescriptorRange.RegisterSpace = 0;
+        srvDescriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+        descriptorRanges.push_back(srvDescriptorRange);
+
+        D3D12_ROOT_PARAMETER srvRootParameter = {};
+        srvRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        srvRootParameter.DescriptorTable.NumDescriptorRanges = 1;
+        srvRootParameter.DescriptorTable.pDescriptorRanges = &descriptorRanges.back();
+        srvRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        rootParameters.push_back(srvRootParameter);
+    }
+
     // Create the root signature description
-    D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-    rootSignatureDesc.NumParameters = _countof(rootParameters);
-    rootSignatureDesc.pParameters = rootParameters;
+    D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
+    rootSignatureDesc.NumParameters = static_cast<UINT>(rootParameters.size());
+    rootSignatureDesc.pParameters = rootParameters.data();
     rootSignatureDesc.NumStaticSamplers = 0;
     rootSignatureDesc.pStaticSamplers = nullptr;
     rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-    
-    Microsoft::WRL::ComPtr<ID3DBlob> serializedRootSignature;
-    Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
-    ThrowIfFailed(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &serializedRootSignature, &errorBlob));
+
+    // Serialize and create the root signature
+    ComPtr<ID3DBlob> serializedRootSignature;
+    ComPtr<ID3DBlob> errorBlob;
+    HRESULT hr = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &serializedRootSignature, &errorBlob);
+    if (FAILED(hr))
+    {
+        if (errorBlob)
+        {
+            OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+        }
+        ThrowIfFailed(hr);
+    }
+
     ThrowIfFailed(m_device->CreateRootSignature(0, serializedRootSignature->GetBufferPointer(), serializedRootSignature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
 }
 
@@ -400,11 +437,11 @@ void EfgInternal::CreateCBVDescriptorHeap(uint32_t numDescriptors)
 {
     if (numDescriptors > 0)
     {
-        D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
-        cbvHeapDesc.NumDescriptors = numDescriptors;
-        cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-        cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-        ThrowIfFailed(m_device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap)));
+        D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+        heapDesc.NumDescriptors = numDescriptors;
+        heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        ThrowIfFailed(m_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_cbvSrvHeap)));
 
         m_cbvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
@@ -415,34 +452,55 @@ void EfgInternal::CreateConstantBufferView(EfgConstantBuffer* buffer, uint32_t h
     D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
     cbvDesc.BufferLocation = buffer->m_bufferResource->GetGPUVirtualAddress();
     cbvDesc.SizeInBytes = buffer->alignmentSize;
-    buffer->cbvHandle = m_cbvHeap->GetCPUDescriptorHandleForHeapStart();
+    buffer->cbvHandle = m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart();
     buffer->cbvHandle.Offset(heapOffset, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
     m_device->CreateConstantBufferView(&cbvDesc, buffer->cbvHandle);
 }
 
+void EfgInternal::CreateStructuredBufferView(EfgStructuredBuffer* buffer, uint32_t heapOffset)
+{
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+    srvDesc.Buffer.FirstElement = 0;
+    srvDesc.Buffer.NumElements = buffer->count;
+    srvDesc.Buffer.StructureByteStride = (UINT)buffer->stride;
+    srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+    srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+    buffer->srvHandle = m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart();
+    buffer->srvHandle.Offset(heapOffset, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
+    m_device->CreateShaderResourceView(buffer->m_bufferResource.Get(), &srvDesc, buffer->srvHandle);
+}
+
 void EfgInternal::CommitShaderResources()
 {
-    uint32_t numDescriptors = (m_cbvDescriptorCount + m_srvDescriptorCount);
-
-    CreateCBVDescriptorHeap(m_cbvDescriptorCount);
+    CreateCBVDescriptorHeap(m_cbvDescriptorCount + m_srvDescriptorCount);
     if (!m_rootSignature)
-        CreateRootSignature(numDescriptors);
+        CreateRootSignature(m_cbvDescriptorCount, m_srvDescriptorCount);
 
     uint32_t heapOffset = 0;
     for (EfgConstantBuffer* buffer : m_constantBuffers) {
         CreateConstantBufferView(buffer, heapOffset);
         heapOffset++;
     }
+
+    for (EfgStructuredBuffer* buffer : m_structuredBuffers) {
+        CreateStructuredBufferView(buffer, heapOffset);
+        heapOffset++;
+    }
 }
 
 void EfgInternal::bindCBVDescriptorHeaps()
 {
-    CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
-    ID3D12DescriptorHeap* descriptorHeaps[] = { m_cbvHeap.Get() };
+    ID3D12DescriptorHeap* descriptorHeaps[] = { m_cbvSrvHeap.Get() };
     m_commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
-    for(uint32_t i = 0; i < m_cbvDescriptorCount; i++)
-        m_commandList->SetGraphicsRootDescriptorTable(0, m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
+    CD3DX12_GPU_DESCRIPTOR_HANDLE cbvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 0, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
+    m_commandList->SetGraphicsRootDescriptorTable(0, cbvGpuHandle);
+
+    CD3DX12_GPU_DESCRIPTOR_HANDLE srvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), m_cbvDescriptorCount, m_cbvDescriptorSize);
+    m_commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
 }
 
 void EfgInternal::DrawInstanced(uint32_t vertexCount)
@@ -599,7 +657,16 @@ void EfgInternal::CreateBuffer(void const* data, EfgBuffer& buffer, EFG_CPU_ACCE
     void* mappedData;
     CD3DX12_RANGE readRange(0, 0);
     ThrowIfFailed(uploadBuffer->Map(0, &readRange, &mappedData));
+
+    // Debug print before copying
+    //const int* intData = reinterpret_cast<const int*>(data);
+    //std::cout << "Data before copy: " << intData[0] << ", " << intData[1] << std::endl;
+
     memcpy(mappedData, data, buffer.size);
+
+    // Debug print after copying
+    //int* mappedIntData = reinterpret_cast<int*>(mappedData);
+    //std::cout << "Mapped data after copy: " << mappedIntData[0] << ", " << mappedIntData[1] << std::endl;
 
     switch(cpuAccess)
     {
@@ -688,29 +755,18 @@ void EfgInternal::CreateConstantBuffer(EfgConstantBuffer& buffer, void const* da
     m_cbvDescriptorCount++;
 }
 
-EfgStructuredBuffer EfgInternal::CreateStructuredBuffer(void const* data, UINT size, uint32_t count)
+void EfgInternal::CreateStructuredBuffer(EfgStructuredBuffer& buffer, void const* data, UINT size, uint32_t count, size_t stride)
 {
-    EfgStructuredBuffer buffer = { };
-
     buffer.size = size;
     buffer.alignmentSize = size;
     buffer.type = EFG_STRUCTURED_BUFFER;
+    buffer.count = count;
+    buffer.stride = stride;
     CreateBuffer(data, buffer, EFG_CPU_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-    srvDesc.Buffer.FirstElement = 0;
-    srvDesc.Buffer.NumElements = count;
-    srvDesc.Buffer.StructureByteStride = size;
-    srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-    srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+    m_structuredBuffers.push_back(&buffer);
 
-    buffer.srvHandle = m_srvHeap->GetCPUDescriptorHandleForHeapStart();
-    buffer.srvHandle.Offset(m_srvDescriptorCount, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
-    m_device->CreateShaderResourceView(buffer.m_bufferResource.Get(), &srvDesc, buffer.srvHandle);
     m_srvDescriptorCount++;
-
-    return buffer;
 }
 
 void EfgInternal::updateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size)

@@ -100,14 +100,14 @@ public:
 	static inline EfgInternal* GetEfg(EfgContext& context);
     EfgVertexBuffer CreateVertexBuffer(void const* data, UINT size);
     EfgIndexBuffer CreateIndexBuffer(void const* data, UINT size);
-    EfgConstantBuffer CreateConstantBuffer(void const* data, UINT size);
+    void CreateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size);
     EfgStructuredBuffer CreateStructuredBuffer(void const* data, UINT size, uint32_t numElements);
     void updateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size);
     void BindVertexBuffer(EfgVertexBuffer buffer);
     void BindIndexBuffer(EfgIndexBuffer buffer);
+    void CommitShaderResources();
     EfgProgram CreateProgram(LPCWSTR fileName);
     EfgPSO CreateGraphicsPipelineState(EfgProgram program);
-    void createCBVDescriptorHeap(uint32_t numDescriptors);
     void SetPipelineState(EfgPSO pso);
     void DrawInstanced(uint32_t vertexCount);
     void DrawIndexedInstanced(uint32_t indexCount);
@@ -138,6 +138,8 @@ private:
     void CopyBuffer(ComPtr<ID3D12Resource> dest, ComPtr<ID3D12Resource> src, UINT size, D3D12_RESOURCE_STATES current, D3D12_RESOURCE_STATES final);
     ComPtr<ID3D12Resource> CreateBufferResource(EFG_CPU_ACCESS cpuAccess, UINT size);
     void TransitionResourceState(ComPtr<ID3D12Resource>& resource, D3D12_RESOURCE_STATES currentState, D3D12_RESOURCE_STATES newState);
+    void CreateCBVDescriptorHeap(uint32_t numDescriptors);
+    void CreateConstantBufferView(EfgConstantBuffer* buffer, uint32_t heapOffset);
 
 	HWND window_ = {};
     static const UINT FrameCount = 2;
@@ -164,6 +166,8 @@ private:
     UINT m_cbvDescriptorSize = 0;
     uint32_t m_cbvDescriptorCount = 0;
     uint32_t m_srvDescriptorCount = 0;
+    std::list<EfgConstantBuffer*> m_constantBuffers = {};
+    std::list<EfgConstantBuffer*> m_structuredBuffers = {};
 
     EfgPSO m_boundPSO = {};
     EfgVertexBuffer m_boundVertexBuffer = {};
@@ -182,16 +186,16 @@ void efgBindVertexBuffer(EfgContext context, EfgVertexBuffer buffer);
 void efgBindIndexBuffer(EfgContext context, EfgIndexBuffer buffer);
 EfgVertexBuffer efgCreateVertexBuffer(EfgContext context, void const* data, UINT size);
 EfgIndexBuffer efgCreateIndexBuffer(EfgContext context, void const* data, UINT size);
-EfgConstantBuffer efgCreateConstantBuffer(EfgContext context, void const* data, UINT size);
+void efgCreateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size);
 EfgStructuredBuffer efgCreateStructuredBuffer(EfgContext context, void const* data, UINT size, uint32_t count);
 void efgUpdateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size);
+void efgCommitShaderResources(EfgContext context);
 EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName);
 EfgPSO efgCreateGraphicsPipelineState(EfgContext context, EfgProgram program);
 void efgSetPipelineState(EfgContext efg, EfgPSO pso);
 void efgDrawInstanced(EfgContext efg, uint32_t vertexCount);
 void efgDrawIndexedInstanced(EfgContext efg, uint32_t indexCount);
 void efgRender(EfgContext efg);
-void efgCreateCBVDescriptorHeap(EfgContext context, uint32_t numDescriptors);
 XMMATRIX efgCreateTransformMatrix(XMFLOAT3 translation, XMFLOAT3 rotation, XMFLOAT3 scale);
 
 template<typename TYPE>
@@ -209,10 +213,9 @@ EfgIndexBuffer efgCreateIndexBuffer(EfgContext context, void const* data, uint32
 }
 
 template<typename TYPE>
-EfgConstantBuffer efgCreateConstantBuffer(EfgContext context, void const* data, uint32_t count)
+void efgCreateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, uint32_t count)
 {
-    EfgConstantBuffer buffer = efgCreateConstantBuffer(context, data, count * sizeof(TYPE));
-    return buffer;
+    efgCreateConstantBuffer(context, buffer, data, count * sizeof(TYPE));
 }
 
 template<typename TYPE>

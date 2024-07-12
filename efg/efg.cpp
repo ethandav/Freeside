@@ -21,10 +21,10 @@ void efgRender(EfgContext context)
     efg->Render();
 }
 
-void efgCreateCBVDescriptorHeap(EfgContext context, uint32_t numDescriptors)
+void efgCommitShaderResources(EfgContext context)
 {
 	EfgInternal* efg = EfgInternal::GetEfg(context);
-    efg->createCBVDescriptorHeap(numDescriptors);
+    efg->CommitShaderResources();
 }
 
 EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName)
@@ -57,10 +57,10 @@ EfgIndexBuffer efgCreateIndexBuffer(EfgContext context, void const* data, UINT s
     return efg->CreateIndexBuffer(data, size);
 }
 
-EfgConstantBuffer efgCreateConstantBuffer(EfgContext context, void const* data, UINT size)
+void efgCreateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
-    return efg->CreateConstantBuffer(data, size);
+    return efg->CreateConstantBuffer(buffer, data, size);
 }
 
 EfgStructuredBuffer efgCreateStructuredBuffer(EfgContext context, void const* data, UINT size, uint32_t count)
@@ -396,7 +396,7 @@ void EfgInternal::ExecuteCommandList()
     m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 }
 
-void EfgInternal::createCBVDescriptorHeap(uint32_t numDescriptors)
+void EfgInternal::CreateCBVDescriptorHeap(uint32_t numDescriptors)
 {
     if (numDescriptors > 0)
     {
@@ -407,9 +407,31 @@ void EfgInternal::createCBVDescriptorHeap(uint32_t numDescriptors)
         ThrowIfFailed(m_device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap)));
 
         m_cbvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
+}
 
-        if (!m_rootSignature)
-            CreateRootSignature(numDescriptors);
+void EfgInternal::CreateConstantBufferView(EfgConstantBuffer* buffer, uint32_t heapOffset)
+{
+    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+    cbvDesc.BufferLocation = buffer->m_bufferResource->GetGPUVirtualAddress();
+    cbvDesc.SizeInBytes = buffer->alignmentSize;
+    buffer->cbvHandle = m_cbvHeap->GetCPUDescriptorHandleForHeapStart();
+    buffer->cbvHandle.Offset(heapOffset, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
+    m_device->CreateConstantBufferView(&cbvDesc, buffer->cbvHandle);
+}
+
+void EfgInternal::CommitShaderResources()
+{
+    uint32_t numDescriptors = (m_cbvDescriptorCount + m_srvDescriptorCount);
+
+    CreateCBVDescriptorHeap(m_cbvDescriptorCount);
+    if (!m_rootSignature)
+        CreateRootSignature(numDescriptors);
+
+    uint32_t heapOffset = 0;
+    for (EfgConstantBuffer* buffer : m_constantBuffers) {
+        CreateConstantBufferView(buffer, heapOffset);
+        heapOffset++;
     }
 }
 
@@ -654,25 +676,16 @@ EfgIndexBuffer EfgInternal::CreateIndexBuffer(void const* data, UINT size)
     return buffer;
 }
 
-EfgConstantBuffer EfgInternal::CreateConstantBuffer(void const* data, UINT size)
+void EfgInternal::CreateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size)
 {
-    EfgConstantBuffer buffer = { };
-
     buffer.size = size;
-    buffer.alignmentSize = (size + 255) & ~255; // CB size must be a multiple of 256 bytes.
+    buffer.alignmentSize = (size + 255) & ~255;
     buffer.type = EFG_CONSTANT_BUFFER;
     CreateBuffer(data, buffer, EFG_CPU_WRITE, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 
-    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-    cbvDesc.BufferLocation = buffer.m_bufferResource->GetGPUVirtualAddress();
-    cbvDesc.SizeInBytes = buffer.alignmentSize;
+    m_constantBuffers.push_back(&buffer);
 
-    buffer.cbvHandle = m_cbvHeap->GetCPUDescriptorHandleForHeapStart();
-    buffer.cbvHandle.Offset(m_cbvDescriptorCount, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
-    m_device->CreateConstantBufferView(&cbvDesc, buffer.cbvHandle);
     m_cbvDescriptorCount++;
-
-    return buffer;
 }
 
 EfgStructuredBuffer EfgInternal::CreateStructuredBuffer(void const* data, UINT size, uint32_t count)

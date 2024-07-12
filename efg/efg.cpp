@@ -136,14 +136,11 @@ EfgInternal* EfgInternal::GetEfg(EfgContext& context)
 	return reinterpret_cast<EfgInternal*>(context.handle);
 }
 
-// Helper function for resolving the full path of assets.
 std::wstring EfgInternal::GetAssetFullPath(LPCWSTR assetName)
 {
     return m_assetsPath + assetName;
 }
 
-// Helper function for acquiring the first available hardware adapter that supports Direct3D 12.
-// If no such adapter can be found, *ppAdapter will be set to nullptr.
 _Use_decl_annotations_
 void EfgInternal::GetHardwareAdapter(
     IDXGIFactory1* pFactory,
@@ -210,7 +207,6 @@ void EfgInternal::GetHardwareAdapter(
     *ppAdapter = adapter.Detach();
 }
 
-// Load the rendering pipeline dependencies.
 void EfgInternal::LoadPipeline()
 {
     UINT dxgiFactoryFlags = 0;
@@ -317,7 +313,6 @@ ComPtr<ID3D12DescriptorHeap> EfgInternal::CreateDescriptorHeap(uint32_t numDescr
     heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
     ThrowIfFailed(m_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&heap)));
 
-
     return heap;
 }
 
@@ -352,7 +347,6 @@ void EfgInternal::CreateRootSignature(uint32_t numDescriptors)
     ThrowIfFailed(m_device->CreateRootSignature(0, serializedRootSignature->GetBufferPointer(), serializedRootSignature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
 }
 
-// Load the sample assets.
 void EfgInternal::LoadAssets()
 {
     // Create the command list.
@@ -381,7 +375,6 @@ void EfgInternal::LoadAssets()
     }
 }
 
-// Render the scene.
 void EfgInternal::Render()
 {
     // Indicate that the back buffer will now be used to present.
@@ -735,7 +728,6 @@ void EfgInternal::WaitForGpu()
 
 void EfgInternal::ResetCommandList()
 {
-    // Reset the command list before recording new commands.
     ThrowIfFailed(m_commandAllocator->Reset());
     ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), nullptr));
 }
@@ -764,7 +756,6 @@ EfgPSO EfgInternal::CreateGraphicsPipelineState(EfgProgram program)
     }
 
 
-    // Define the vertex input layout.
     D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
     {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },

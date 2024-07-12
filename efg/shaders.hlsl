@@ -75,7 +75,7 @@ PSInput VSMain(VSInput input)
 
     result.position = clipPos;
     result.fragPos = worldPos.xyz;
-    result.normal = input.normal;
+    result.normal = mul(float4(input.normal, 0.0f), transform).xyz;
     result.uv = input.uv;
 
     return result;

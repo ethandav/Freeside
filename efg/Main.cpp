@@ -43,7 +43,7 @@ int main()
 
     EfgWindow efgWindow = efgCreateWindow(1920, 1080, L"New Window");
     EfgContext efg = efgCreateContext(efgWindow);
-    Camera camera = efgCreateCamera(efg, DirectX::XMFLOAT3(0.0f, 0.0f, 5.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f));
+    Camera camera = efgCreateCamera(efg, DirectX::XMFLOAT3(0.0f, 0.0f, -5.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f));
 
     Shape square = Shapes::getShape(Shapes::CUBE);
     XMMATRIX transformMatrix = efgCreateTransformMatrix(XMFLOAT3(0.0f, 0.0f, 2.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f));

@@ -120,70 +120,87 @@ Shape cube()
     cube.indices = std::vector<uint32_t>(cube.indexCount);
 
     cube.indices = {
-         2,  1,  0, // Top
-         3,  1,  2,
-         6,  5,  4, // Back
-         7,  5,  6,
-        10,  9,  8, // Right
-        11,  9, 10,
-        14, 13, 12, // Front
-        15, 13, 14,
-        18, 17, 16, // Left
-        19, 17, 18,
-        22, 21, 20, // Bottom
-        23, 21, 22
+         0,  1,  2, // TOP
+         2,  1,  3,
+         4,  5,  6, // FRONT
+         6,  5,  7,
+         8,  9, 10, // RIGHT
+        10,  9, 11,
+        12, 13, 14, // BACK
+        14, 13, 15,
+        16, 17, 18, // LEFT
+        18, 17, 19,
+        20, 21, 22, // Bottom
+        22, 21, 23
     };
 
-    cube.vertices[0].position  = XMFLOAT3(-0.5f,  0.5f, -0.5f); //Top
-    cube.vertices[1].position  = XMFLOAT3( 0.5f,  0.5f, -0.5f);
-    cube.vertices[2].position  = XMFLOAT3(-0.5f,  0.5f,  0.5f);
-    cube.vertices[3].position  = XMFLOAT3( 0.5f,  0.5f,  0.5f);
-    cube.vertices[4].position  = XMFLOAT3(-0.5f,  0.5f,  0.5f); //Front
-    cube.vertices[5].position  = XMFLOAT3( 0.5f,  0.5f,  0.5f);
-    cube.vertices[6].position  = XMFLOAT3(-0.5f, -0.5f,  0.5f);
-    cube.vertices[7].position  = XMFLOAT3( 0.5f, -0.5f,  0.5f);
-    cube.vertices[8].position  = XMFLOAT3( 0.5f,  0.5f,  0.5f); //Right
-    cube.vertices[9].position  = XMFLOAT3( 0.5f,  0.5f, -0.5f);
-    cube.vertices[10].position = XMFLOAT3( 0.5f, -0.5f,  0.5f);
-    cube.vertices[11].position = XMFLOAT3( 0.5f, -0.5f, -0.5f);
-    cube.vertices[12].position = XMFLOAT3( 0.5f,  0.5f, -0.5f); //Back
-    cube.vertices[13].position = XMFLOAT3(-0.5f,  0.5f, -0.5f);
-    cube.vertices[14].position = XMFLOAT3( 0.5f, -0.5f, -0.5f);
-    cube.vertices[15].position = XMFLOAT3(-0.5f, -0.5f, -0.5f);
-    cube.vertices[16].position = XMFLOAT3(-0.5f,  0.5f, -0.5f); //Left
-    cube.vertices[17].position = XMFLOAT3(-0.5f,  0.5f,  0.5f);
-    cube.vertices[18].position = XMFLOAT3(-0.5f, -0.5f, -0.5f);
-    cube.vertices[19].position = XMFLOAT3(-0.5f, -0.5f,  0.5f);
-    cube.vertices[20].position = XMFLOAT3(-0.5f, -0.5f,  0.5f); //Bottom
-    cube.vertices[21].position = XMFLOAT3( 0.5f, -0.5f,  0.5f);
-    cube.vertices[22].position = XMFLOAT3(-0.5f, -0.5f, -0.5f);
-    cube.vertices[23].position = XMFLOAT3( 0.5f, -0.5f, -0.5f);
+    // TOP
+    cube.vertices[0].position  = XMFLOAT3(-0.5f,  0.5f,  0.5f); // Back-Left
+    cube.vertices[1].position  = XMFLOAT3( 0.5f,  0.5f,  0.5f); // Back-Right
+    cube.vertices[2].position  = XMFLOAT3(-0.5f,  0.5f, -0.5f); // Front-Left
+    cube.vertices[3].position  = XMFLOAT3( 0.5f,  0.5f, -0.5f); // Front-Right 
+    // FRONT
+    cube.vertices[4].position  = XMFLOAT3(-0.5f,  0.5f, -0.5f); // Top-Left 
+    cube.vertices[5].position  = XMFLOAT3( 0.5f,  0.5f, -0.5f); // Top-Right
+    cube.vertices[6].position  = XMFLOAT3(-0.5f, -0.5f, -0.5f); // Bottom-Left
+    cube.vertices[7].position  = XMFLOAT3( 0.5f, -0.5f, -0.5f); // Bottom-Right
+    // RIGHT
+    cube.vertices[8].position  = XMFLOAT3( 0.5f,  0.5f, -0.5f);
+    cube.vertices[9].position  = XMFLOAT3( 0.5f,  0.5f,  0.5f);
+    cube.vertices[10].position = XMFLOAT3( 0.5f, -0.5f, -0.5f);
+    cube.vertices[11].position = XMFLOAT3( 0.5f, -0.5f,  0.5f);
+    // BACK
+    cube.vertices[12].position = XMFLOAT3( 0.5f,  0.5f, 0.5f);
+    cube.vertices[13].position = XMFLOAT3(-0.5f,  0.5f, 0.5f);
+    cube.vertices[14].position = XMFLOAT3( 0.5f, -0.5f, 0.5f);
+    cube.vertices[15].position = XMFLOAT3(-0.5f, -0.5f, 0.5f);
+    // LEFT
+    cube.vertices[16].position = XMFLOAT3(-0.5f,  0.5f,  0.5f);
+    cube.vertices[17].position = XMFLOAT3(-0.5f,  0.5f, -0.5f);
+    cube.vertices[18].position = XMFLOAT3(-0.5f, -0.5f,  0.5f);
+    cube.vertices[19].position = XMFLOAT3(-0.5f, -0.5f, -0.5f);
+    // BOTTOM
+    cube.vertices[20].position = XMFLOAT3(-0.5f, -0.5f, -0.5f);
+    cube.vertices[21].position = XMFLOAT3( 0.5f, -0.5f, -0.5f);
+    cube.vertices[22].position = XMFLOAT3(-0.5f, -0.5f,  0.5f);
+    cube.vertices[23].position = XMFLOAT3( 0.5f, -0.5f,  0.5f);
 
-    cube.vertices[0].normal  = XMFLOAT3( 0.0f,  1.0f,  0.0f); //Top
+    // TOP
+    cube.vertices[0].normal  = XMFLOAT3( 0.0f,  1.0f,  0.0f);
     cube.vertices[1].normal  = XMFLOAT3( 0.0f,  1.0f,  0.0f);
     cube.vertices[2].normal  = XMFLOAT3( 0.0f,  1.0f,  0.0f); 
     cube.vertices[3].normal  = XMFLOAT3( 0.0f,  1.0f,  0.0f);
-    cube.vertices[4].normal  = XMFLOAT3( 0.0f,  0.0f,  1.0f); //Front
-    cube.vertices[5].normal  = XMFLOAT3( 0.0f,  0.0f,  1.0f);
-    cube.vertices[6].normal  = XMFLOAT3( 0.0f,  0.0f,  1.0f);
-    cube.vertices[7].normal  = XMFLOAT3( 0.0f,  0.0f,  1.0f);
-    cube.vertices[8].normal  = XMFLOAT3( 1.0f,  0.0f,  0.0f); //Right
+    // FRONT
+    cube.vertices[4].normal  = XMFLOAT3( 0.0f,  0.0f, -1.0f);
+    cube.vertices[5].normal  = XMFLOAT3( 0.0f,  0.0f, -1.0f);
+    cube.vertices[6].normal  = XMFLOAT3( 0.0f,  0.0f, -1.0f);
+    cube.vertices[7].normal  = XMFLOAT3( 0.0f,  0.0f, -1.0f);
+
+    // RIGHT
+    cube.vertices[8].normal  = XMFLOAT3( 1.0f,  0.0f,  0.0f);
     cube.vertices[9].normal  = XMFLOAT3( 1.0f,  0.0f,  0.0f);
     cube.vertices[10].normal = XMFLOAT3( 1.0f,  0.0f,  0.0f);
     cube.vertices[11].normal = XMFLOAT3( 1.0f,  0.0f,  0.0f);
-    cube.vertices[12].normal = XMFLOAT3( 0.0f,  0.0f, -1.0f); //Back
-    cube.vertices[13].normal = XMFLOAT3( 0.0f,  0.0f, -1.0f);
-    cube.vertices[14].normal = XMFLOAT3( 0.0f,  0.0f, -1.0f);
-    cube.vertices[15].normal = XMFLOAT3( 0.0f,  0.0f, -1.0f);
-    cube.vertices[16].normal = XMFLOAT3(-1.0f,  0.0f,  0.0f); //Left
+
+    // BACK
+    cube.vertices[12].normal = XMFLOAT3( 0.0f,  0.0f,  1.0f);
+    cube.vertices[13].normal = XMFLOAT3( 0.0f,  0.0f,  1.0f);
+    cube.vertices[14].normal = XMFLOAT3( 0.0f,  0.0f,  1.0f);
+    cube.vertices[15].normal = XMFLOAT3( 0.0f,  0.0f,  1.0f);
+
+    // LEFT
+    cube.vertices[16].normal = XMFLOAT3(-1.0f,  0.0f,  0.0f);
     cube.vertices[17].normal = XMFLOAT3(-1.0f,  0.0f,  0.0f);
     cube.vertices[18].normal = XMFLOAT3(-1.0f,  0.0f,  0.0f);
     cube.vertices[19].normal = XMFLOAT3(-1.0f,  0.0f,  0.0f);
-    cube.vertices[20].normal = XMFLOAT3( 0.0f, -1.0f,  0.0f); //Bottom
+
+    // BOTTOM
+    cube.vertices[20].normal = XMFLOAT3( 0.0f, -1.0f,  0.0f);
     cube.vertices[21].normal = XMFLOAT3( 0.0f, -1.0f,  0.0f);
     cube.vertices[22].normal = XMFLOAT3( 0.0f, -1.0f,  0.0f);
     cube.vertices[23].normal = XMFLOAT3( 0.0f, -1.0f,  0.0f);
 
+/*
     // Top face
     cube.vertices[0].uv = XMFLOAT2(0.0f, 0.0f);
     cube.vertices[1].uv = XMFLOAT2(1.0f, 0.0f);
@@ -194,7 +211,6 @@ Shape cube()
     cube.vertices[5].uv = XMFLOAT2(1.0f, 0.0f);
     cube.vertices[6].uv = XMFLOAT2(0.0f, 1.0f);
     cube.vertices[7].uv = XMFLOAT2(1.0f, 1.0f);
-
     // Right face
     cube.vertices[8].uv = XMFLOAT2(0.0f, 0.0f);
     cube.vertices[9].uv = XMFLOAT2(1.0f, 0.0f);
@@ -215,7 +231,7 @@ Shape cube()
     cube.vertices[21].uv = XMFLOAT2(1.0f, 0.0f);
     cube.vertices[22].uv = XMFLOAT2(0.0f, 1.0f);
     cube.vertices[23].uv = XMFLOAT2(1.0f, 1.0f);
-
+ */
     return cube;
 }
 

@@ -200,7 +200,6 @@ Shape cube()
     cube.vertices[22].normal = XMFLOAT3( 0.0f, -1.0f,  0.0f);
     cube.vertices[23].normal = XMFLOAT3( 0.0f, -1.0f,  0.0f);
 
-/*
     // Top face
     cube.vertices[0].uv = XMFLOAT2(0.0f, 0.0f);
     cube.vertices[1].uv = XMFLOAT2(1.0f, 0.0f);
@@ -231,7 +230,7 @@ Shape cube()
     cube.vertices[21].uv = XMFLOAT2(1.0f, 0.0f);
     cube.vertices[22].uv = XMFLOAT2(0.0f, 1.0f);
     cube.vertices[23].uv = XMFLOAT2(1.0f, 1.0f);
- */
+
     return cube;
 }
 
@@ -397,14 +396,13 @@ Shape sphere(float diameter = 1.0f)
             const size_t nextI = i + 1;
             const size_t nextJ = (j + 1) % stride;
 
-            // Correct winding for counter-clockwise order
             sphere.indices.push_back(i * stride + j);
-            sphere.indices.push_back(nextI * stride + j);
             sphere.indices.push_back(i * stride + nextJ);
+            sphere.indices.push_back(nextI * stride + j);
 
             sphere.indices.push_back(i * stride + nextJ);
-            sphere.indices.push_back(nextI * stride + j);
             sphere.indices.push_back(nextI * stride + nextJ);
+            sphere.indices.push_back(nextI * stride + j);
         }
     }
 

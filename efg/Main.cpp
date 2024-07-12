@@ -43,18 +43,40 @@ int main()
 
     EfgWindow efgWindow = efgCreateWindow(1920, 1080, L"New Window");
     EfgContext efg = efgCreateContext(efgWindow);
-    Camera camera = efgCreateCamera(efg, DirectX::XMFLOAT3(0.0f, 0.0f, -5.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f));
+    Camera camera = efgCreateCamera(efg, DirectX::XMFLOAT3(0.0f, 0.0f, 5.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f));
 
-    Shape square = Shapes::getShape(Shapes::SPHERE);
-    XMMATRIX transformMatrix = efgCreateTransformMatrix(XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f));
+    Shape square = Shapes::getShape(Shapes::CUBE);
+    XMMATRIX transformMatrix = efgCreateTransformMatrix(XMFLOAT3(0.0f, 0.0f, 2.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f));
 
-    efgCreateCBVDescriptorHeap(efg, 3);
+    efgCreateCBVDescriptorHeap(efg, 5);
+
+    struct LightBuffer
+    {
+        XMFLOAT4 position = XMFLOAT4(0.0f, 0.0f, -2.0f, 0.0f);
+        XMFLOAT4 ambient = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.0f);
+        XMFLOAT4 diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.0f);
+        XMFLOAT4 specular = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.0f);
+        XMFLOAT4 attenuation = XMFLOAT4(1.0f, 0.009f, 0.0032f, 0.0f);
+    };
+    LightBuffer lightData;
+
+    struct MaterialBuffer
+    {
+        XMFLOAT4 ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 0.0f);
+        XMFLOAT4 diffuse = XMFLOAT4(0.5f, 0.5f, 0.5f, 0.0f);
+        XMFLOAT4 specular = XMFLOAT4(0.5f, 0.5f, 0.5f, 0.0f);
+        float shininess = 32.0f;
+        float padding[3];
+    };
+    MaterialBuffer material;
 
     EfgVertexBuffer vertexBuffer = efgCreateVertexBuffer<Vertex>(efg, square.vertices.data(), square.vertexCount);
     EfgIndexBuffer indexBuffer = efgCreateIndexBuffer<uint32_t>(efg, square.indices.data(), square.indexCount);
     EfgConstantBuffer viewProjBuffer = efgCreateConstantBuffer<XMMATRIX>(efg, &camera.viewProj, 1);
     EfgConstantBuffer transformBuffer = efgCreateConstantBuffer<XMMATRIX>(efg, &transformMatrix, 1);
-    EfgConstantBuffer transformBuffer2 = efgCreateConstantBuffer<XMMATRIX>(efg, &transformMatrix, 1);
+    EfgConstantBuffer lightBuffer = efgCreateConstantBuffer<LightBuffer>(efg, &lightData, 1);
+    EfgConstantBuffer viewPosBuffer = efgCreateConstantBuffer<XMFLOAT3>(efg, &camera.eye, 1);
+    EfgConstantBuffer materialBuffer = efgCreateConstantBuffer<MaterialBuffer>(efg, &material, 1);
 
     EfgProgram program = efgCreateProgram(efg, L"shaders.hlsl");
     EfgPSO pso = efgCreateGraphicsPipelineState(efg, program);
@@ -64,6 +86,7 @@ int main()
         efgWindowPumpEvents(efgWindow);
         efgUpdateCamera(efg, efgWindow, camera);
         efgUpdateConstantBuffer(efg, viewProjBuffer, &camera.viewProj, sizeof(camera.viewProj));
+        efgUpdateConstantBuffer(efg, viewPosBuffer, &camera.eye, sizeof(camera.eye));
         efgBindVertexBuffer(efg, vertexBuffer);
         efgBindIndexBuffer(efg, indexBuffer);
         efgSetPipelineState(efg, pso);

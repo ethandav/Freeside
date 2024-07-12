@@ -28,7 +28,8 @@ enum EFG_BUFFER_TYPE
 {
     EFG_VERTEX_BUFFER,
     EFG_INDEX_BUFFER,
-    EFG_CONSTANT_BUFFER
+    EFG_CONSTANT_BUFFER,
+    EFG_STRUCTURED_BUFFER
 } EFG_BUFFER_TYPE;
 
 typedef
@@ -63,6 +64,12 @@ struct EfgConstantBuffer : public EfgBuffer
     CD3DX12_CPU_DESCRIPTOR_HANDLE cbvHandle = {};
 };
 
+struct EfgStructuredBuffer: public EfgBuffer
+{
+    D3D12_SHADER_RESOURCE_VIEW_DESC viewDesc = {};
+    CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle = {};
+};
+
 struct EfgPSO
 {
     ComPtr<ID3D12RootSignature> rootSignature;
@@ -94,6 +101,7 @@ public:
     EfgVertexBuffer CreateVertexBuffer(void const* data, UINT size);
     EfgIndexBuffer CreateIndexBuffer(void const* data, UINT size);
     EfgConstantBuffer CreateConstantBuffer(void const* data, UINT size);
+    EfgStructuredBuffer CreateStructuredBuffer(void const* data, UINT size, uint32_t numElements);
     void updateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size);
     void BindVertexBuffer(EfgVertexBuffer buffer);
     void BindIndexBuffer(EfgIndexBuffer buffer);
@@ -149,11 +157,13 @@ private:
     ComPtr<ID3D12CommandQueue> m_commandQueue;
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
     ComPtr<ID3D12DescriptorHeap> m_cbvHeap;
+    ComPtr<ID3D12DescriptorHeap> m_srvHeap;
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
     ComPtr<ID3D12RootSignature> m_rootSignature;
     UINT m_rtvDescriptorSize = 0;
     UINT m_cbvDescriptorSize = 0;
     uint32_t m_cbvDescriptorCount = 0;
+    uint32_t m_srvDescriptorCount = 0;
 
     EfgPSO m_boundPSO = {};
     EfgVertexBuffer m_boundVertexBuffer = {};
@@ -173,6 +183,7 @@ void efgBindIndexBuffer(EfgContext context, EfgIndexBuffer buffer);
 EfgVertexBuffer efgCreateVertexBuffer(EfgContext context, void const* data, UINT size);
 EfgIndexBuffer efgCreateIndexBuffer(EfgContext context, void const* data, UINT size);
 EfgConstantBuffer efgCreateConstantBuffer(EfgContext context, void const* data, UINT size);
+EfgStructuredBuffer efgCreateStructuredBuffer(EfgContext context, void const* data, UINT size, uint32_t count);
 void efgUpdateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size);
 EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName);
 EfgPSO efgCreateGraphicsPipelineState(EfgContext context, EfgProgram program);
@@ -201,5 +212,12 @@ template<typename TYPE>
 EfgConstantBuffer efgCreateConstantBuffer(EfgContext context, void const* data, uint32_t count)
 {
     EfgConstantBuffer buffer = efgCreateConstantBuffer(context, data, count * sizeof(TYPE));
+    return buffer;
+}
+
+template<typename TYPE>
+EfgStructuredBuffer efgCreateStructuredBuffer(EfgContext context, void const* data, uint32_t count)
+{
+    EfgStructuredBuffer buffer = efgCreateStructuredBuffer(context, data, count * sizeof(TYPE), count);
     return buffer;
 }

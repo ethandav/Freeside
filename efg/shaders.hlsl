@@ -19,6 +19,11 @@ cbuffer TransformBuffer : register(b1)
     matrix transform;
 }
 
+cbuffer TransformBufferB : register(b2)
+{
+    matrix transformB;
+}
+
 struct VSInput
 {
     float4 position : POSITION;

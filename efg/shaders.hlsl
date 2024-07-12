@@ -19,21 +19,8 @@ cbuffer TransformBuffer : register(b1)
     matrix transform;
 }
 
-struct LightData
-{
-    float4 position;
-    float4 ambient;
-    float4 diffuse;
-    float4 specular;
-    float4 attenuation;
-};
 
-cbuffer LightBuffer : register(b2)
-{
-    LightData light;
-}
-
-cbuffer ViewBuffer : register(b3)
+cbuffer ViewBuffer : register(b2)
 {
     float3 viewPos;
 }
@@ -47,9 +34,25 @@ struct Material
     float3 padding;
 };
 
-cbuffer MaterialBuffer : register(b4)
+cbuffer MaterialBuffer : register(b3)
 {
     Material material;
+}
+
+struct LightData
+{
+    float4 color;
+    float4 position;
+    float4 ambient;
+    float4 diffuse;
+    float4 specular;
+    float4 attenuation;
+};
+StructuredBuffer<LightData> lights : register(t0);
+
+cbuffer LightConstants : register(b4)
+{
+    uint lightCount;
 }
 
 struct VSInput
@@ -66,8 +69,6 @@ struct PSInput
     float3 normal : NORMAL;
     float2 uv : TEXCOORD;
 };
-
-StructuredBuffer<int> nums : register(t0);
 
 PSInput VSMain(VSInput input)
 {
@@ -98,8 +99,8 @@ float3 calculatePointLight(LightData light, float3 normal, float3 fragPos, float
     float attenuation = 1.0 / (light.attenuation.x + light.attenuation.y * distance + light.attenuation.z * (distance * distance));
 
     // Material
-    float3 ambient = light.ambient * material.ambient;
-    float3 diffuse = light.diffuse.xyz * (diff * material.diffuse.xyz);
+    float3 ambient = (light.ambient * light.color) * material.ambient;
+    float3 diffuse = (light.diffuse.xyz * light.color) * (diff * material.diffuse.xyz);
     float3 specular = light.specular.xyz * (spec * material.specular.xyz);
 
     ambient *= attenuation;
@@ -111,9 +112,14 @@ float3 calculatePointLight(LightData light, float3 normal, float3 fragPos, float
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
-    float3 normal = normalize(input.normal + nums[0]);
+    float3 normal = normalize(input.normal);
     float3 viewDir = normalize(viewPos - input.fragPos);
     
-    float3 color = calculatePointLight(light, normal, input.fragPos, viewDir);
+    float3 color;
+
+    for (uint i = 0; i < lightCount; ++i)
+    {
+        color += calculatePointLight(lights[i], normal, input.fragPos, viewDir);
+    }
     return float4(color, 1.0f);
 }

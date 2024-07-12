@@ -50,13 +50,25 @@ int main()
 
     struct LightBuffer
     {
+        XMFLOAT4 color = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.0f);
         XMFLOAT4 position = XMFLOAT4(0.0f, 0.0f, -2.0f, 0.0f);
         XMFLOAT4 ambient = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.0f);
         XMFLOAT4 diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.0f);
         XMFLOAT4 specular = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.0f);
         XMFLOAT4 attenuation = XMFLOAT4(1.0f, 0.009f, 0.0032f, 0.0f);
     };
-    LightBuffer lightData;
+    std::vector<LightBuffer> lights(2);
+    lights[0].position = XMFLOAT4(3.0f, 0.0f, 0.0f, 0.0f);
+    lights[0].color = XMFLOAT4(0.0f, 0.0f, 1.0f, 0.0f);
+    lights[1].position = XMFLOAT4(-3.0f, 0.0f, 0.0f, 0.0f);
+    lights[1].color = XMFLOAT4(1.0f, 0.0f, 0.0f, 0.0f);
+
+    struct LightConstants
+    {
+        uint32_t numPointLights = 0;
+    };
+    LightConstants lightData;
+    lightData.numPointLights = lights.size();
 
     struct MaterialBuffer
     {
@@ -74,20 +86,18 @@ int main()
     EfgConstantBuffer
         viewProjBuffer,
         transformBuffer,
-        lightBuffer,
         viewPosBuffer,
-        materialBuffer;
-
-    EfgStructuredBuffer testBuffer;
+        materialBuffer,
+        lightDataBuffer;
 
     efgCreateConstantBuffer<XMMATRIX>(efg, viewProjBuffer, &camera.viewProj, 1);
     efgCreateConstantBuffer<XMMATRIX>(efg, transformBuffer, &transformMatrix, 1);
-    efgCreateConstantBuffer<LightBuffer>(efg, lightBuffer, &lightData, 1);
     efgCreateConstantBuffer<XMFLOAT3>(efg, viewPosBuffer, &camera.eye, 1);
     efgCreateConstantBuffer<MaterialBuffer>(efg, materialBuffer, &material, 1);
+    efgCreateConstantBuffer<LightBuffer>(efg, lightDataBuffer, &lightData, 1);
 
-    std::vector<int> nums = { 1,2 };
-    efgCreateStructuredBuffer<int>(efg, testBuffer, nums.data(), 2);
+    EfgStructuredBuffer lightBuffer;
+    efgCreateStructuredBuffer<LightBuffer>(efg, lightBuffer, lights.data(), lights.size());
 
     efgCommitShaderResources(efg);
     EfgProgram program = efgCreateProgram(efg, L"shaders.hlsl");

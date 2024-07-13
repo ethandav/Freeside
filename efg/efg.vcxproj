@@ -134,6 +134,7 @@
     <ClInclude Include="DXHelper.h" />
     <ClInclude Include="efg.h" />
     <ClInclude Include="efg_camera.h" />
+    <ClInclude Include="efg_exception.h" />
     <ClInclude Include="efg_window.h" />
     <ClInclude Include="Shapes.h" />
   </ItemGroup>

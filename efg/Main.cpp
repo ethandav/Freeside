@@ -68,7 +68,7 @@ int main()
         uint32_t numPointLights = 0;
     };
     LightConstants lightData;
-    lightData.numPointLights = lights.size();
+    lightData.numPointLights = (uint32_t)lights.size();
 
     struct MaterialBuffer
     {
@@ -97,7 +97,7 @@ int main()
     efgCreateConstantBuffer<LightBuffer>(efg, lightDataBuffer, &lightData, 1);
 
     EfgStructuredBuffer lightBuffer;
-    efgCreateStructuredBuffer<LightBuffer>(efg, lightBuffer, lights.data(), lights.size());
+    efgCreateStructuredBuffer<LightBuffer>(efg, lightBuffer, lights.data(), (uint32_t)lights.size());
 
     efgCommitShaderResources(efg);
     EfgProgram program = efgCreateProgram(efg, L"shaders.hlsl");

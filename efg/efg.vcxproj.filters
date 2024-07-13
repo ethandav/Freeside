@@ -30,6 +30,9 @@
     <ClInclude Include="efg_camera.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="efg_exception.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">

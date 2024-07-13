@@ -1,4 +1,5 @@
 #include "efg.h"
+#include "efg_exception.h"
 #include <iostream>
 
 EfgContext efgCreateContext(HWND window)
@@ -21,10 +22,16 @@ void efgRender(EfgContext context)
     efg->Render();
 }
 
-void efgCommitShaderResources(EfgContext context)
+EfgResult efgCommitShaderResources(EfgContext context)
 {
 	EfgInternal* efg = EfgInternal::GetEfg(context);
-    efg->CommitShaderResources();
+    if (!efg)
+    {
+        EFG_SHOW_ERROR("Cannot commit shader resources: Invalid Context");
+        return EfgResult_InvalidContext;
+    }
+    EFG_INTERNAL_TRY(efg->CommitShaderResources());
+    return EfgResult_NoError;
 }
 
 EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName)
@@ -36,6 +43,8 @@ EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName)
 EfgPSO efgCreateGraphicsPipelineState(EfgContext context, EfgProgram program)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
+    if (!efg)
+        EFG_SHOW_ERROR("Cannot commit shader resources: Invalid Context");
     return efg->CreateGraphicsPipelineState(program);
 }
 
@@ -227,14 +236,14 @@ void EfgInternal::LoadPipeline()
 #endif
 
     ComPtr<IDXGIFactory4> factory;
-    ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
+    EFG_D3D_TRY(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
 
     if (useWarpDevice)
     {
         ComPtr<IDXGIAdapter> warpAdapter;
-        ThrowIfFailed(factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)));
+        EFG_D3D_TRY(factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)));
 
-        ThrowIfFailed(D3D12CreateDevice(
+        EFG_D3D_TRY(D3D12CreateDevice(
             warpAdapter.Get(),
             D3D_FEATURE_LEVEL_11_0,
             IID_PPV_ARGS(&m_device)
@@ -245,7 +254,7 @@ void EfgInternal::LoadPipeline()
         ComPtr<IDXGIAdapter1> hardwareAdapter;
         GetHardwareAdapter(factory.Get(), &hardwareAdapter);
 
-        ThrowIfFailed(D3D12CreateDevice(
+        EFG_D3D_TRY(D3D12CreateDevice(
             hardwareAdapter.Get(),
             D3D_FEATURE_LEVEL_11_0,
             IID_PPV_ARGS(&m_device)
@@ -257,7 +266,7 @@ void EfgInternal::LoadPipeline()
     queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
-    ThrowIfFailed(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
+    EFG_D3D_TRY(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
 
     // Describe and create the swap chain.
     DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
@@ -270,7 +279,7 @@ void EfgInternal::LoadPipeline()
     swapChainDesc.SampleDesc.Count = 1;
 
     ComPtr<IDXGISwapChain1> swapChain;
-    ThrowIfFailed(factory->CreateSwapChainForHwnd(
+    EFG_D3D_TRY(factory->CreateSwapChainForHwnd(
         m_commandQueue.Get(),        // Swap chain needs the queue so that it can force a flush on it.
         window_,
         &swapChainDesc,
@@ -280,9 +289,9 @@ void EfgInternal::LoadPipeline()
         ));
 
     // This sample does not support fullscreen transitions.
-    ThrowIfFailed(factory->MakeWindowAssociation(window_, DXGI_MWA_NO_ALT_ENTER));
+    EFG_D3D_TRY(factory->MakeWindowAssociation(window_, DXGI_MWA_NO_ALT_ENTER));
 
-    ThrowIfFailed(swapChain.As(&m_swapChain));
+    EFG_D3D_TRY(swapChain.As(&m_swapChain));
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
     m_rtvHeap = CreateDescriptorHeap(FrameCount, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
@@ -295,13 +304,13 @@ void EfgInternal::LoadPipeline()
         // Create a RTV for each frame.
         for (UINT n = 0; n < FrameCount; n++)
         {
-            ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
+            EFG_D3D_TRY(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
             m_device->CreateRenderTargetView(m_renderTargets[n].Get(), nullptr, rtvHandle);
             rtvHandle.Offset(1, m_rtvDescriptorSize);
         }
     }
 
-    ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
+    EFG_D3D_TRY(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
 }
 
 ComPtr<ID3D12DescriptorHeap> EfgInternal::CreateDescriptorHeap(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type)
@@ -311,12 +320,12 @@ ComPtr<ID3D12DescriptorHeap> EfgInternal::CreateDescriptorHeap(uint32_t numDescr
     heapDesc.NumDescriptors = numDescriptors;
     heapDesc.Type = type;
     heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-    ThrowIfFailed(m_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&heap)));
+    EFG_D3D_TRY(m_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&heap)));
 
     return heap;
 }
 
-void EfgInternal::CreateRootSignature(uint32_t numCbv, uint32_t numSrv)
+EfgResult EfgInternal::CreateRootSignature(uint32_t numCbv, uint32_t numSrv)
 {
     std::vector<D3D12_ROOT_PARAMETER> rootParameters;
     std::vector<D3D12_DESCRIPTOR_RANGE> descriptorRanges;
@@ -378,31 +387,32 @@ void EfgInternal::CreateRootSignature(uint32_t numCbv, uint32_t numSrv)
         {
             OutputDebugStringA((char*)errorBlob->GetBufferPointer());
         }
-        ThrowIfFailed(hr);
+        throw EfgException(hr);
     }
 
-    ThrowIfFailed(m_device->CreateRootSignature(0, serializedRootSignature->GetBufferPointer(), serializedRootSignature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
+    EFG_D3D_TRY(m_device->CreateRootSignature(0, serializedRootSignature->GetBufferPointer(), serializedRootSignature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
+    return EfgResult_NoError;
 }
 
 void EfgInternal::LoadAssets()
 {
     // Create the command list.
-    ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator.Get(), nullptr, IID_PPV_ARGS(&m_commandList)));
+    EFG_D3D_TRY(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator.Get(), nullptr, IID_PPV_ARGS(&m_commandList)));
 
     // Command lists are created in the recording state, but there is nothing
     // to record yet. The main loop expects it to be closed, so close it now.
-    ThrowIfFailed(m_commandList->Close());
+    EFG_D3D_TRY(m_commandList->Close());
 
     // Create synchronization objects and wait until assets have been uploaded to the GPU.
     {
-        ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
+        EFG_D3D_TRY(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
         m_fenceValue = 1;
 
         // Create an event handle to use for frame synchronization.
         m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
         if (m_fenceEvent == nullptr)
         {
-            ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError()));
+            EFG_D3D_TRY(HRESULT_FROM_WIN32(GetLastError()));
         }
 
         // Wait for the command list to execute; we are reusing the same command 
@@ -420,7 +430,7 @@ void EfgInternal::Render()
     ExecuteCommandList();
 
     // Present the frame.
-    ThrowIfFailed(m_swapChain->Present(1, 0));
+    EFG_D3D_TRY(m_swapChain->Present(1, 0));
 
     WaitForPreviousFrame();
 }
@@ -428,36 +438,44 @@ void EfgInternal::Render()
 void EfgInternal::ExecuteCommandList()
 {
     // Execute the command list.
-    ThrowIfFailed(m_commandList->Close());
+    EFG_D3D_TRY(m_commandList->Close());
     ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
     m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 }
 
-void EfgInternal::CreateCBVDescriptorHeap(uint32_t numDescriptors)
+EfgResult EfgInternal::CreateCBVDescriptorHeap(uint32_t numDescriptors)
 {
     if (numDescriptors > 0)
     {
+        numDescriptors = -2; // DELETE ME
         D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
         heapDesc.NumDescriptors = numDescriptors;
         heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-        ThrowIfFailed(m_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_cbvSrvHeap)));
+        EFG_D3D_TRY(m_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_cbvSrvHeap)));
 
         m_cbvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
+    return EfgResult_NoError;
 }
 
-void EfgInternal::CreateConstantBufferView(EfgConstantBuffer* buffer, uint32_t heapOffset)
+EfgResult EfgInternal::CreateConstantBufferView(EfgConstantBuffer* buffer, uint32_t heapOffset)
 {
+    if (!m_cbvSrvHeap)
+    {
+        EFG_SHOW_ERROR("Cannot create CBV. Heap was not created.");
+        return EfgResult_InvalidOperation;
+    }
     D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
     cbvDesc.BufferLocation = buffer->m_bufferResource->GetGPUVirtualAddress();
     cbvDesc.SizeInBytes = buffer->alignmentSize;
     buffer->cbvHandle = m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart();
     buffer->cbvHandle.Offset(heapOffset, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
     m_device->CreateConstantBufferView(&cbvDesc, buffer->cbvHandle);
+    return EfgResult_NoError;
 }
 
-void EfgInternal::CreateStructuredBufferView(EfgStructuredBuffer* buffer, uint32_t heapOffset)
+EfgResult EfgInternal::CreateStructuredBufferView(EfgStructuredBuffer* buffer, uint32_t heapOffset)
 {
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
@@ -471,36 +489,41 @@ void EfgInternal::CreateStructuredBufferView(EfgStructuredBuffer* buffer, uint32
     buffer->srvHandle = m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart();
     buffer->srvHandle.Offset(heapOffset, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
     m_device->CreateShaderResourceView(buffer->m_bufferResource.Get(), &srvDesc, buffer->srvHandle);
+    return EfgResult_NoError;
 }
 
-void EfgInternal::CommitShaderResources()
+EfgResult EfgInternal::CommitShaderResources()
 {
-    CreateCBVDescriptorHeap(m_cbvDescriptorCount + m_srvDescriptorCount);
+    EFG_CHECK_RESULT(CreateCBVDescriptorHeap(m_cbvDescriptorCount + m_srvDescriptorCount));
     if (!m_rootSignature)
-        CreateRootSignature(m_cbvDescriptorCount, m_srvDescriptorCount);
+        EFG_CHECK_RESULT(CreateRootSignature(m_cbvDescriptorCount, m_srvDescriptorCount));
 
     uint32_t heapOffset = 0;
     for (EfgConstantBuffer* buffer : m_constantBuffers) {
-        CreateConstantBufferView(buffer, heapOffset);
+        EFG_CHECK_RESULT(CreateConstantBufferView(buffer, heapOffset));
         heapOffset++;
     }
 
     for (EfgStructuredBuffer* buffer : m_structuredBuffers) {
-        CreateStructuredBufferView(buffer, heapOffset);
+        EFG_CHECK_RESULT(CreateStructuredBufferView(buffer, heapOffset));
         heapOffset++;
     }
+    return EfgResult_NoError;
 }
 
-void EfgInternal::bindCBVDescriptorHeaps()
+void EfgInternal::bindDescriptorHeaps()
 {
-    ID3D12DescriptorHeap* descriptorHeaps[] = { m_cbvSrvHeap.Get() };
-    m_commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+    if (m_cbvSrvHeap)
+    {
+        ID3D12DescriptorHeap* descriptorHeaps[] = { m_cbvSrvHeap.Get() };
+        m_commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
-    CD3DX12_GPU_DESCRIPTOR_HANDLE cbvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 0, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
-    m_commandList->SetGraphicsRootDescriptorTable(0, cbvGpuHandle);
+        CD3DX12_GPU_DESCRIPTOR_HANDLE cbvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 0, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
+        m_commandList->SetGraphicsRootDescriptorTable(0, cbvGpuHandle);
 
-    CD3DX12_GPU_DESCRIPTOR_HANDLE srvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), m_cbvDescriptorCount, m_cbvDescriptorSize);
-    m_commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
+        CD3DX12_GPU_DESCRIPTOR_HANDLE srvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), m_cbvDescriptorCount, m_cbvDescriptorSize);
+        m_commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
+    }
 }
 
 void EfgInternal::DrawInstanced(uint32_t vertexCount)
@@ -508,12 +531,12 @@ void EfgInternal::DrawInstanced(uint32_t vertexCount)
     // Command list allocators can only be reset when the associated 
     // command lists have finished execution on the GPU; apps should use 
     // fences to determine GPU execution progress.
-    ThrowIfFailed(m_commandAllocator->Reset());
+    EFG_D3D_TRY(m_commandAllocator->Reset());
 
     // However, when ExecuteCommandList() is called on a particular command 
     // list, that command list can then be reset at any time and must be before 
     // re-recording.
-    ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), m_boundPSO.pipelineState.Get()));
+    EFG_D3D_TRY(m_commandList->Reset(m_commandAllocator.Get(), m_boundPSO.pipelineState.Get()));
 
     // Set necessary state.
     //m_commandList->SetGraphicsRootSignature(m_boundPSO.rootSignature.Get());
@@ -521,7 +544,7 @@ void EfgInternal::DrawInstanced(uint32_t vertexCount)
     m_commandList->RSSetViewports(1, &m_viewport);
     m_commandList->RSSetScissorRects(1, &m_scissorRect);
 
-    bindCBVDescriptorHeaps();
+    bindDescriptorHeaps();
 
     // Indicate that the back buffer will be used as a render target.
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
@@ -544,12 +567,12 @@ void EfgInternal::DrawIndexedInstanced(uint32_t indexCount)
     // Command list allocators can only be reset when the associated 
     // command lists have finished execution on the GPU; apps should use 
     // fences to determine GPU execution progress.
-    ThrowIfFailed(m_commandAllocator->Reset());
+    EFG_D3D_TRY(m_commandAllocator->Reset());
 
     // However, when ExecuteCommandList() is called on a particular command 
     // list, that command list can then be reset at any time and must be before 
     // re-recording.
-    ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), m_boundPSO.pipelineState.Get()));
+    EFG_D3D_TRY(m_commandList->Reset(m_commandAllocator.Get(), m_boundPSO.pipelineState.Get()));
 
     // Set necessary state.
     //m_commandList->SetGraphicsRootSignature(m_boundPSO.rootSignature.Get());
@@ -557,7 +580,7 @@ void EfgInternal::DrawIndexedInstanced(uint32_t indexCount)
     m_commandList->RSSetViewports(1, &m_viewport);
     m_commandList->RSSetScissorRects(1, &m_scissorRect);
 
-    bindCBVDescriptorHeaps();
+    bindDescriptorHeaps();
 
     // Indicate that the back buffer will be used as a render target.
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
@@ -595,13 +618,13 @@ void EfgInternal::WaitForPreviousFrame()
 
     // Signal and increment the fence value.
     const UINT64 fence = m_fenceValue;
-    ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), fence));
+    EFG_D3D_TRY(m_commandQueue->Signal(m_fence.Get(), fence));
     m_fenceValue++;
 
     // Wait until the previous frame is finished.
     if (m_fence->GetCompletedValue() < fence)
     {
-        ThrowIfFailed(m_fence->SetEventOnCompletion(fence, m_fenceEvent));
+        EFG_D3D_TRY(m_fence->SetEventOnCompletion(fence, m_fenceEvent));
         WaitForSingleObject(m_fenceEvent, INFINITE);
     }
 
@@ -638,7 +661,7 @@ ComPtr<ID3D12Resource> EfgInternal::CreateBufferResource(EFG_CPU_ACCESS cpuAcces
     heapProps.CreationNodeMask = 1;
     heapProps.VisibleNodeMask = 1;
 
-    ThrowIfFailed(m_device->CreateCommittedResource(
+    EFG_D3D_TRY(m_device->CreateCommittedResource(
         &heapProps,
         D3D12_HEAP_FLAG_NONE,
         &resourceDesc,
@@ -656,7 +679,7 @@ void EfgInternal::CreateBuffer(void const* data, EfgBuffer& buffer, EFG_CPU_ACCE
     
     void* mappedData;
     CD3DX12_RANGE readRange(0, 0);
-    ThrowIfFailed(uploadBuffer->Map(0, &readRange, &mappedData));
+    EFG_D3D_TRY(uploadBuffer->Map(0, &readRange, &mappedData));
 
     // Debug print before copying
     //const int* intData = reinterpret_cast<const int*>(data);
@@ -788,8 +811,8 @@ void EfgInternal::WaitForGpu()
     {
         HANDLE eventHandle = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
         if (eventHandle == NULL)
-            ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError()));
-        ThrowIfFailed(m_fence->SetEventOnCompletion(m_fenceValue, eventHandle));
+            EFG_D3D_TRY(HRESULT_FROM_WIN32(GetLastError()));
+        EFG_D3D_TRY(m_fence->SetEventOnCompletion(m_fenceValue, eventHandle));
         WaitForSingleObject(eventHandle, INFINITE);
         CloseHandle(eventHandle);
     }
@@ -797,8 +820,8 @@ void EfgInternal::WaitForGpu()
 
 void EfgInternal::ResetCommandList()
 {
-    ThrowIfFailed(m_commandAllocator->Reset());
-    ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), nullptr));
+    EFG_D3D_TRY(m_commandAllocator->Reset());
+    EFG_D3D_TRY(m_commandList->Reset(m_commandAllocator.Get(), nullptr));
 }
 
 EfgProgram EfgInternal::CreateProgram(LPCWSTR fileName)
@@ -812,19 +835,6 @@ EfgProgram EfgInternal::CreateProgram(LPCWSTR fileName)
 EfgPSO EfgInternal::CreateGraphicsPipelineState(EfgProgram program)
 {
     EfgPSO pso = {};
-
-    // Create an empty root signature.
-    {
-        CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-        rootSignatureDesc.Init(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-        ComPtr<ID3DBlob> signature;
-        ComPtr<ID3DBlob> error;
-        ThrowIfFailed(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
-        ThrowIfFailed(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&pso.rootSignature)));
-    }
-
-
     D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
     {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -833,6 +843,8 @@ EfgPSO EfgInternal::CreateGraphicsPipelineState(EfgProgram program)
         { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
     };
 
+    if (!m_rootSignature)
+        CreateRootSignature(0, 0);
 
     // Describe and create the graphics pipeline state object (PSO).
     pso.desc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
@@ -848,7 +860,7 @@ EfgPSO EfgInternal::CreateGraphicsPipelineState(EfgProgram program)
     pso.desc.NumRenderTargets = 1;
     pso.desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
     pso.desc.SampleDesc.Count = 1;
-    ThrowIfFailed(m_device->CreateGraphicsPipelineState(&pso.desc, IID_PPV_ARGS(&pso.pipelineState)));
+    EFG_D3D_TRY(m_device->CreateGraphicsPipelineState(&pso.desc, IID_PPV_ARGS(&pso.pipelineState)));
     return pso;
 }
 
@@ -876,7 +888,28 @@ void EfgInternal::CompileProgram(EfgProgram& program)
     UINT compileFlags = 0;
 #endif
 
-    ThrowIfFailed(D3DCompileFromFile(program.source.c_str(), nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &program.vs, nullptr));
-    ThrowIfFailed(D3DCompileFromFile(program.source.c_str(), nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &program.ps, nullptr));
+    EFG_D3D_TRY(D3DCompileFromFile(program.source.c_str(), nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &program.vs, nullptr));
+    EFG_D3D_TRY(D3DCompileFromFile(program.source.c_str(), nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &program.ps, nullptr));
 }
 
+void EfgInternal::CheckD3DErrors()
+{
+    ComPtr<ID3D12InfoQueue> infoQueue;
+    if (SUCCEEDED(m_device.As(&infoQueue)))
+    {
+        UINT64 messageCount = infoQueue->GetNumStoredMessagesAllowedByRetrievalFilter();
+        for (UINT64 i = 0; i < messageCount; ++i)
+        {
+            SIZE_T messageLength = 0;
+            infoQueue->GetMessage(i, nullptr, &messageLength);
+            D3D12_MESSAGE* message = (D3D12_MESSAGE*)malloc(messageLength);
+            if (message)
+            {
+                infoQueue->GetMessage(i, message, &messageLength);
+                std::cerr << "D3D12 Error: " << message->pDescription << std::endl;
+                free(message);
+            }
+        }
+        infoQueue->ClearStoredMessages();
+    }
+}

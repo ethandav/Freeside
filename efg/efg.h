@@ -40,6 +40,16 @@ enum EFG_CPU_ACCESS
     EFG_CPU_WRITE
 } EFG_CPU_ACCESS;
 
+enum EfgResult
+{
+    EfgResult_NoError,
+    EfgResult_InvalidContext,
+    EfgResult_InvalidOperation,
+    EfgResult_InvalidParameter,
+    EfgResult_OutOfMemory,
+    EfgResult_InternalError
+};
+
 struct EfgBuffer
 {
     EFG_BUFFER_TYPE type;
@@ -107,7 +117,7 @@ public:
     void updateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size);
     void BindVertexBuffer(EfgVertexBuffer buffer);
     void BindIndexBuffer(EfgIndexBuffer buffer);
-    void CommitShaderResources();
+    EfgResult CommitShaderResources();
     EfgProgram CreateProgram(LPCWSTR fileName);
     EfgPSO CreateGraphicsPipelineState(EfgProgram program);
     void SetPipelineState(EfgPSO pso);
@@ -115,6 +125,7 @@ public:
     void DrawIndexedInstanced(uint32_t indexCount);
     void Render();
     void Destroy();
+    void CheckD3DErrors();
 
 private:
     void GetHardwareAdapter(
@@ -129,8 +140,8 @@ private:
 
     void CompileProgram(EfgProgram& program);
     ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type);
-    void CreateRootSignature(uint32_t numCbv, uint32_t numSrv);
-    void bindCBVDescriptorHeaps();
+    EfgResult CreateRootSignature(uint32_t numCbv, uint32_t numSrv);
+    void bindDescriptorHeaps();
 
     void ResetCommandList();
     void ExecuteCommandList();
@@ -140,9 +151,9 @@ private:
     void CopyBuffer(ComPtr<ID3D12Resource> dest, ComPtr<ID3D12Resource> src, UINT size, D3D12_RESOURCE_STATES current, D3D12_RESOURCE_STATES final);
     ComPtr<ID3D12Resource> CreateBufferResource(EFG_CPU_ACCESS cpuAccess, UINT size);
     void TransitionResourceState(ComPtr<ID3D12Resource>& resource, D3D12_RESOURCE_STATES currentState, D3D12_RESOURCE_STATES newState);
-    void CreateCBVDescriptorHeap(uint32_t numDescriptors);
-    void CreateConstantBufferView(EfgConstantBuffer* buffer, uint32_t heapOffset);
-    void CreateStructuredBufferView(EfgStructuredBuffer* buffer, uint32_t heapOffset);
+    EfgResult CreateCBVDescriptorHeap(uint32_t numDescriptors);
+    EfgResult CreateConstantBufferView(EfgConstantBuffer* buffer, uint32_t heapOffset);
+    EfgResult CreateStructuredBufferView(EfgStructuredBuffer* buffer, uint32_t heapOffset);
 
 	HWND window_ = {};
     static const UINT FrameCount = 2;
@@ -192,7 +203,7 @@ EfgIndexBuffer efgCreateIndexBuffer(EfgContext context, void const* data, UINT s
 void efgCreateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size);
 void efgCreateStructuredBuffer(EfgContext context, EfgStructuredBuffer& buffer, void const* data, UINT size, uint32_t count, size_t stride);
 void efgUpdateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size);
-void efgCommitShaderResources(EfgContext context);
+EfgResult efgCommitShaderResources(EfgContext context);
 EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName);
 EfgPSO efgCreateGraphicsPipelineState(EfgContext context, EfgProgram program);
 void efgSetPipelineState(EfgContext efg, EfgPSO pso);

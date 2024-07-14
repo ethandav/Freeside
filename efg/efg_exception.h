@@ -25,7 +25,7 @@
         } \
     } while(0)
 
-#define EFG_INTERNAL_TRY_RET(fn) \
+#define EFG_INTERNAL_TRY_RET(fn, fail) \
     do { \
         try { \
             return (fn); \
@@ -34,6 +34,7 @@
         { \
             efg->CheckD3DErrors(); \
             ex.Print(); \
+            return fail; \
         } \
     } while(0)
 

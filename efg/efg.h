@@ -52,7 +52,7 @@ enum EfgResult
 
 struct EfgBuffer
 {
-    EFG_BUFFER_TYPE type;
+    EFG_BUFFER_TYPE type = {};
     UINT size = 0;
     UINT alignmentSize = 0;
     ComPtr<ID3D12Resource> m_bufferResource;
@@ -195,21 +195,21 @@ private:
 };
 
 EfgContext efgCreateContext(HWND window);
-void efgDestroyContext(EfgContext context);
-void efgBindVertexBuffer(EfgContext context, EfgVertexBuffer buffer);
-void efgBindIndexBuffer(EfgContext context, EfgIndexBuffer buffer);
+EfgResult efgDestroyContext(EfgContext context);
+EfgResult efgBindVertexBuffer(EfgContext context, EfgVertexBuffer buffer);
+EfgResult efgBindIndexBuffer(EfgContext context, EfgIndexBuffer buffer);
 EfgVertexBuffer efgCreateVertexBuffer(EfgContext context, void const* data, UINT size);
 EfgIndexBuffer efgCreateIndexBuffer(EfgContext context, void const* data, UINT size);
-void efgCreateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size);
-void efgCreateStructuredBuffer(EfgContext context, EfgStructuredBuffer& buffer, void const* data, UINT size, uint32_t count, size_t stride);
-void efgUpdateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size);
+EfgResult efgCreateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size);
+EfgResult efgCreateStructuredBuffer(EfgContext context, EfgStructuredBuffer& buffer, void const* data, UINT size, uint32_t count, size_t stride);
+EfgResult efgUpdateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size);
 EfgResult efgCommitShaderResources(EfgContext context);
 EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName);
 EfgPSO efgCreateGraphicsPipelineState(EfgContext context, EfgProgram program);
-void efgSetPipelineState(EfgContext efg, EfgPSO pso);
-void efgDrawInstanced(EfgContext efg, uint32_t vertexCount);
-void efgDrawIndexedInstanced(EfgContext efg, uint32_t indexCount);
-void efgRender(EfgContext efg);
+EfgResult efgSetPipelineState(EfgContext efg, EfgPSO pso);
+EfgResult efgDrawInstanced(EfgContext efg, uint32_t vertexCount);
+EfgResult efgDrawIndexedInstanced(EfgContext efg, uint32_t indexCount);
+EfgResult efgRender(EfgContext efg);
 XMMATRIX efgCreateTransformMatrix(XMFLOAT3 translation, XMFLOAT3 rotation, XMFLOAT3 scale);
 
 template<typename TYPE>

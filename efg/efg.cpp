@@ -10,16 +10,28 @@ EfgContext efgCreateContext(HWND window)
 	return context;
 }
 
-void efgDestroyContext(EfgContext context)
+EfgResult efgDestroyContext(EfgContext context)
 {
 	EfgInternal* efg = EfgInternal::GetEfg(context);
+    if (!efg)
+    {
+        EFG_SHOW_ERROR("Cannot destroy: Invalid context");
+        return EfgResult_InvalidContext;
+    }
 	delete efg;
+    return EfgResult_NoError;
 }
 
-void efgRender(EfgContext context)
+EfgResult efgRender(EfgContext context)
 {
 	EfgInternal* efg = EfgInternal::GetEfg(context);
+    if (!efg)
+    {
+        EFG_SHOW_ERROR("Cannot Render: Invalid context");
+        return EfgResult_InvalidContext;
+    }
     efg->Render();
+    return EfgResult_NoError;
 }
 
 EfgResult efgCommitShaderResources(EfgContext context)
@@ -42,71 +54,131 @@ EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName)
 
 EfgPSO efgCreateGraphicsPipelineState(EfgContext context, EfgProgram program)
 {
-    EfgPSO pso = {};
     EfgInternal* efg = EfgInternal::GetEfg(context);
     if (!efg)
+    {
         EFG_SHOW_ERROR("Cannot commit shader resources: Invalid Context");
-    EFG_INTERNAL_TRY_RET(efg->CreateGraphicsPipelineState(program));
+        return EfgPSO();
+    }
+    EFG_INTERNAL_TRY_RET(efg->CreateGraphicsPipelineState(program), EfgPSO());
 }
 
-void efgSetPipelineState(EfgContext context, EfgPSO pso)
+EfgResult efgSetPipelineState(EfgContext context, EfgPSO pso)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
+    if (!efg)
+    {
+        EFG_SHOW_ERROR("Cannot Set Pipeline State: Invalid context");
+        return EfgResult_InvalidContext;
+    }
     efg->SetPipelineState(pso);
+    return EfgResult_NoError;
 }
 
 EfgVertexBuffer efgCreateVertexBuffer(EfgContext context, void const* data, UINT size)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
-    return efg->CreateVertexBuffer(data, size);
+    if (!efg)
+    {
+        EFG_SHOW_ERROR("Cannot create vertex buffer: Invalid context");
+        return EfgVertexBuffer();
+    }
+    EFG_INTERNAL_TRY_RET(efg->CreateVertexBuffer(data, size), EfgVertexBuffer());
 }
 
 EfgIndexBuffer efgCreateIndexBuffer(EfgContext context, void const* data, UINT size)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
-    return efg->CreateIndexBuffer(data, size);
+    if (!efg)
+    {
+        EFG_SHOW_ERROR("Cannot create index buffer: Invalid context");
+        return EfgIndexBuffer();
+    }
+    EFG_INTERNAL_TRY_RET(efg->CreateIndexBuffer(data, size), EfgIndexBuffer());
 }
 
-void efgCreateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size)
+EfgResult efgCreateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
-    efg->CreateConstantBuffer(buffer, data, size);
+    if (!efg)
+    {
+        EFG_SHOW_ERROR("Cannot create Constant Buffer: Invalid context");
+        return EfgResult_InvalidContext;
+    }
+    EFG_INTERNAL_TRY(efg->CreateConstantBuffer(buffer, data, size));
+    return EfgResult_NoError;
 }
 
-void efgCreateStructuredBuffer(EfgContext context, EfgStructuredBuffer& buffer, void const* data, UINT size, uint32_t count, size_t stride)
+EfgResult efgCreateStructuredBuffer(EfgContext context, EfgStructuredBuffer& buffer, void const* data, UINT size, uint32_t count, size_t stride)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
-    efg->CreateStructuredBuffer(buffer, data, size, count, stride);
+    if (!efg)
+    {
+        EFG_SHOW_ERROR("Cannot create Structured Buffer: Invalid context");
+        return EfgResult_InvalidContext;
+    }
+    EFG_INTERNAL_TRY(efg->CreateStructuredBuffer(buffer, data, size, count, stride));
+    return EfgResult_NoError;
 }
 
-void efgUpdateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size)
+EfgResult efgUpdateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
+    if (!efg)
+    {
+        EFG_SHOW_ERROR("Cannot update Constant Buffer: Invalid context");
+        return EfgResult_InvalidContext;
+    }
     efg->updateConstantBuffer(buffer, data, size);
+    return EfgResult_NoError;
 }
 
-void efgBindVertexBuffer(EfgContext context, EfgVertexBuffer buffer)
+EfgResult efgBindVertexBuffer(EfgContext context, EfgVertexBuffer buffer)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
-    efg->BindVertexBuffer(buffer);
+    if (!efg)
+    {
+        EFG_SHOW_ERROR("Cannot bind Vertex Buffer: Invalid context");
+        return EfgResult_InvalidContext;
+    }
+    EFG_INTERNAL_TRY(efg->BindVertexBuffer(buffer));
+    return EfgResult_NoError;
 }
 
-void efgBindIndexBuffer(EfgContext context, EfgIndexBuffer buffer)
+EfgResult efgBindIndexBuffer(EfgContext context, EfgIndexBuffer buffer)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
-    efg->BindIndexBuffer(buffer);
+    if (!efg)
+    {
+        EFG_SHOW_ERROR("Cannot bind Index Buffer: Invalid context");
+        return EfgResult_InvalidContext;
+    }
+    EFG_INTERNAL_TRY(efg->BindIndexBuffer(buffer));
+    return EfgResult_NoError;
 }
 
-void efgDrawInstanced(EfgContext context, uint32_t vertexCount)
+EfgResult efgDrawInstanced(EfgContext context, uint32_t vertexCount)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
-    efg->DrawInstanced(vertexCount);
+    if (!efg)
+    {
+        EFG_SHOW_ERROR("Cannot bind Index Buffer: Invalid context");
+        return EfgResult_InvalidContext;
+    }
+    EFG_INTERNAL_TRY(efg->DrawInstanced(vertexCount));
+    return EfgResult_NoError;
 }
 
-void efgDrawIndexedInstanced(EfgContext context, uint32_t indexCount)
+EfgResult efgDrawIndexedInstanced(EfgContext context, uint32_t indexCount)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
-    efg->DrawIndexedInstanced(indexCount);
+    if (!efg)
+    {
+        EFG_SHOW_ERROR("Cannot bind Index Buffer: Invalid context");
+        return EfgResult_InvalidContext;
+    }
+    EFG_INTERNAL_TRY(efg->DrawIndexedInstanced(indexCount));
+    return EfgResult_NoError;
 }
 
 XMMATRIX efgCreateTransformMatrix(XMFLOAT3 translation, XMFLOAT3 rotation, XMFLOAT3 scale)
@@ -448,7 +520,6 @@ EfgResult EfgInternal::CreateCBVDescriptorHeap(uint32_t numDescriptors)
 {
     if (numDescriptors > 0)
     {
-        numDescriptors = -2; // DELETE ME
         D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
         heapDesc.NumDescriptors = numDescriptors;
         heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;

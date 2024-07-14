@@ -42,10 +42,11 @@ EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName)
 
 EfgPSO efgCreateGraphicsPipelineState(EfgContext context, EfgProgram program)
 {
+    EfgPSO pso = {};
     EfgInternal* efg = EfgInternal::GetEfg(context);
     if (!efg)
         EFG_SHOW_ERROR("Cannot commit shader resources: Invalid Context");
-    return efg->CreateGraphicsPipelineState(program);
+    EFG_INTERNAL_TRY_RET(efg->CreateGraphicsPipelineState(program));
 }
 
 void efgSetPipelineState(EfgContext context, EfgPSO pso)
@@ -494,18 +495,18 @@ EfgResult EfgInternal::CreateStructuredBufferView(EfgStructuredBuffer* buffer, u
 
 EfgResult EfgInternal::CommitShaderResources()
 {
-    EFG_CHECK_RESULT(CreateCBVDescriptorHeap(m_cbvDescriptorCount + m_srvDescriptorCount));
+    CreateCBVDescriptorHeap(m_cbvDescriptorCount + m_srvDescriptorCount);
     if (!m_rootSignature)
-        EFG_CHECK_RESULT(CreateRootSignature(m_cbvDescriptorCount, m_srvDescriptorCount));
+        CreateRootSignature(m_cbvDescriptorCount, m_srvDescriptorCount);
 
     uint32_t heapOffset = 0;
     for (EfgConstantBuffer* buffer : m_constantBuffers) {
-        EFG_CHECK_RESULT(CreateConstantBufferView(buffer, heapOffset));
+        CreateConstantBufferView(buffer, heapOffset);
         heapOffset++;
     }
 
     for (EfgStructuredBuffer* buffer : m_structuredBuffers) {
-        EFG_CHECK_RESULT(CreateStructuredBufferView(buffer, heapOffset));
+        CreateStructuredBufferView(buffer, heapOffset);
         heapOffset++;
     }
     return EfgResult_NoError;

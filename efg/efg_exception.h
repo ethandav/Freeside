@@ -19,23 +19,28 @@
         } \
         catch (const EfgException& ex) \
         { \
-            ex.Print(); \
             efg->CheckD3DErrors(); \
+            ex.Print(); \
             return EfgResult_InternalError; \
         } \
     } while(0)
 
-#define EFG_D3D_TRY(fn) \
+#define EFG_INTERNAL_TRY_RET(fn) \
     do { \
         try { \
-            HRESULT _hr = (fn); \
-            if (FAILED(_hr)) { \
-                throw EfgException(_hr); \
-            } \
+            return (fn); \
         } \
-        catch (const std::exception e) \
+        catch (const EfgException& ex) \
         { \
-            CheckD3DErrors(); \
+            efg->CheckD3DErrors(); \
+            ex.Print(); \
+        } \
+    } while(0)
+
+#define EFG_D3D_TRY(hr) \
+    do { \
+        if (FAILED(hr)) { \
+            throw EfgException(hr); \
         } \
     } while (0)
 

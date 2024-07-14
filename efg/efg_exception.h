@@ -25,16 +25,17 @@
         } \
     } while(0)
 
-#define EFG_INTERNAL_TRY_RET(fn, fail) \
+#define EFG_INTERNAL_TRY_RET(fn, obj) \
     do { \
         try { \
-            return (fn); \
+            obj = (fn); \
+            return obj; \
         } \
         catch (const EfgException& ex) \
         { \
             efg->CheckD3DErrors(); \
             ex.Print(); \
-            return fail; \
+            return obj; \
         } \
     } while(0)
 

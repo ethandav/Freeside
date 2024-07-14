@@ -50,6 +50,9 @@ struct LightData
 };
 StructuredBuffer<LightData> lights : register(t0);
 
+Texture2D mytexture : register(t1);
+SamplerState textureSampler : register(s0);
+
 cbuffer LightConstants : register(b4)
 {
     uint lightCount;
@@ -100,7 +103,7 @@ float3 calculatePointLight(LightData light, float3 normal, float3 fragPos, float
 
     // Material
     float3 ambient = (light.ambient * light.color) * material.ambient;
-    float3 diffuse = (light.diffuse.xyz * light.color) * (diff * material.diffuse.xyz);
+    float3 diffuse = (light.diffuse.xyz * light.color.xyz) * (diff * material.diffuse.xyz);
     float3 specular = light.specular.xyz * (spec * material.specular.xyz);
 
     ambient *= attenuation;
@@ -115,7 +118,7 @@ float4 PSMain(PSInput input) : SV_TARGET
     float3 normal = normalize(input.normal);
     float3 viewDir = normalize(viewPos - input.fragPos);
     
-    float3 color;
+    float3 color = mytexture.Sample(textureSampler, input.uv);
 
     for (uint i = 0; i < lightCount; ++i)
     {

@@ -9,6 +9,8 @@
 #include <dxgi1_6.h>
 #include <D3Dcompiler.h>
 #include <DirectXMath.h>
+#include <ResourceUploadBatch.h>
+#include <WICTextureLoader.h>
 #include <string>
 #include <wrl.h>
 #include <shellapi.h>
@@ -82,6 +84,18 @@ struct EfgStructuredBuffer: public EfgBuffer
     CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle = {};
 };
 
+struct EfgTexture
+{
+    ComPtr<ID3D12Resource> resource;
+    D3D12_SHADER_RESOURCE_VIEW_DESC viewDesc = {};
+    CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle = {};
+};
+
+struct EfgSampler
+{
+    D3D12_SAMPLER_DESC desc = {};
+};
+
 struct EfgPSO
 {
     ComPtr<ID3D12RootSignature> rootSignature;
@@ -114,6 +128,8 @@ public:
     EfgIndexBuffer CreateIndexBuffer(void const* data, UINT size);
     void CreateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size);
     void CreateStructuredBuffer(EfgStructuredBuffer& buffer, void const* data, UINT size, uint32_t numElements, size_t stride);
+    void CreateTexture2D(EfgTexture& texture, const wchar_t* filename);
+    void CreateSampler(EfgSampler & sampler);
     void updateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size);
     void BindVertexBuffer(EfgVertexBuffer buffer);
     void BindIndexBuffer(EfgIndexBuffer buffer);
@@ -140,7 +156,7 @@ private:
 
     void CompileProgram(EfgProgram& program);
     ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type);
-    EfgResult CreateRootSignature(uint32_t numCbv, uint32_t numSrv);
+    EfgResult CreateRootSignature(uint32_t numCbv, uint32_t numSrv, uint32_t numSampler);
     void bindDescriptorHeaps();
 
     void ResetCommandList();
@@ -152,8 +168,11 @@ private:
     ComPtr<ID3D12Resource> CreateBufferResource(EFG_CPU_ACCESS cpuAccess, UINT size);
     void TransitionResourceState(ComPtr<ID3D12Resource>& resource, D3D12_RESOURCE_STATES currentState, D3D12_RESOURCE_STATES newState);
     EfgResult CreateCBVDescriptorHeap(uint32_t numDescriptors);
+    void CreateSamplerDescriptorHeap(uint32_t samplerCount);
     EfgResult CreateConstantBufferView(EfgConstantBuffer* buffer, uint32_t heapOffset);
     EfgResult CreateStructuredBufferView(EfgStructuredBuffer* buffer, uint32_t heapOffset);
+    void CreateTextureView(EfgTexture* texture, uint32_t heapOffset);
+    void CommitSampler(EfgSampler * sampler, uint32_t heapOffset);
 
 	HWND window_ = {};
     static const UINT FrameCount = 2;
@@ -173,6 +192,7 @@ private:
     ComPtr<ID3D12CommandQueue> m_commandQueue;
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
     ComPtr<ID3D12DescriptorHeap> m_cbvSrvHeap;
+    ComPtr<ID3D12DescriptorHeap> m_samplerHeap;
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
     ComPtr<ID3D12RootSignature> m_rootSignature;
     UINT m_rtvDescriptorSize = 0;
@@ -180,8 +200,11 @@ private:
     UINT m_srvDescriptorSize = 0;
     uint32_t m_cbvDescriptorCount = 0;
     uint32_t m_srvDescriptorCount = 0;
+    uint32_t m_samplerCount = 0;
     std::list<EfgConstantBuffer*> m_constantBuffers = {};
     std::list<EfgStructuredBuffer*> m_structuredBuffers = {};
+    std::list<EfgTexture*> m_textures = {};
+    std::list<EfgSampler*> m_samplers = {};
 
     EfgPSO m_boundPSO = {};
     EfgVertexBuffer m_boundVertexBuffer = {};
@@ -202,6 +225,8 @@ EfgVertexBuffer efgCreateVertexBuffer(EfgContext context, void const* data, UINT
 EfgIndexBuffer efgCreateIndexBuffer(EfgContext context, void const* data, UINT size);
 EfgResult efgCreateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size);
 EfgResult efgCreateStructuredBuffer(EfgContext context, EfgStructuredBuffer& buffer, void const* data, UINT size, uint32_t count, size_t stride);
+EfgResult efgCreateTexture2D(EfgContext context, EfgTexture& texture, const wchar_t* filename);
+EfgResult efgCreateSampler(EfgContext context, EfgSampler& sampler);
 EfgResult efgUpdateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size);
 EfgResult efgCommitShaderResources(EfgContext context);
 EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName);

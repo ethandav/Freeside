@@ -54,13 +54,14 @@ EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName)
 
 EfgPSO efgCreateGraphicsPipelineState(EfgContext context, EfgProgram program)
 {
+    EfgPSO pso = {};
     EfgInternal* efg = EfgInternal::GetEfg(context);
     if (!efg)
     {
         EFG_SHOW_ERROR("Cannot commit shader resources: Invalid Context");
-        return EfgPSO();
+        return pso;
     }
-    EFG_INTERNAL_TRY_RET(efg->CreateGraphicsPipelineState(program), EfgPSO());
+    EFG_INTERNAL_TRY_RET(efg->CreateGraphicsPipelineState(program), pso);
 }
 
 EfgResult efgSetPipelineState(EfgContext context, EfgPSO pso)
@@ -77,24 +78,26 @@ EfgResult efgSetPipelineState(EfgContext context, EfgPSO pso)
 
 EfgVertexBuffer efgCreateVertexBuffer(EfgContext context, void const* data, UINT size)
 {
+    EfgVertexBuffer buffer = {};
     EfgInternal* efg = EfgInternal::GetEfg(context);
     if (!efg)
     {
         EFG_SHOW_ERROR("Cannot create vertex buffer: Invalid context");
-        return EfgVertexBuffer();
+        return buffer;
     }
-    EFG_INTERNAL_TRY_RET(efg->CreateVertexBuffer(data, size), EfgVertexBuffer());
+    EFG_INTERNAL_TRY_RET(efg->CreateVertexBuffer(data, size), buffer);
 }
 
 EfgIndexBuffer efgCreateIndexBuffer(EfgContext context, void const* data, UINT size)
 {
+    EfgIndexBuffer buffer = {};
     EfgInternal* efg = EfgInternal::GetEfg(context);
     if (!efg)
     {
         EFG_SHOW_ERROR("Cannot create index buffer: Invalid context");
-        return EfgIndexBuffer();
+        return buffer;
     }
-    EFG_INTERNAL_TRY_RET(efg->CreateIndexBuffer(data, size), EfgIndexBuffer());
+    EFG_INTERNAL_TRY_RET(efg->CreateIndexBuffer(data, size), buffer);
 }
 
 EfgResult efgCreateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size)
@@ -119,6 +122,28 @@ EfgResult efgCreateStructuredBuffer(EfgContext context, EfgStructuredBuffer& buf
     }
     EFG_INTERNAL_TRY(efg->CreateStructuredBuffer(buffer, data, size, count, stride));
     return EfgResult_NoError;
+}
+
+EfgResult efgCreateTexture2D(EfgContext context, EfgTexture& texture, const wchar_t* filename)
+{
+    EfgInternal* efg = EfgInternal::GetEfg(context);
+    if (!efg)
+    {
+        EFG_SHOW_ERROR("Cannot create Structured Buffer: Invalid context");
+        return EfgResult_InvalidContext;
+    }
+    EFG_INTERNAL_TRY(efg->CreateTexture2D(texture, filename));
+}
+
+EfgResult efgCreateSampler(EfgContext context, EfgSampler& sampler)
+{
+    EfgInternal* efg = EfgInternal::GetEfg(context);
+    if (!efg)
+    {
+        EFG_SHOW_ERROR("Cannot create Sampler: Invalid context");
+        return EfgResult_InvalidContext;
+    }
+    EFG_INTERNAL_TRY(efg->CreateSampler(sampler));
 }
 
 EfgResult efgUpdateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size)
@@ -398,11 +423,11 @@ ComPtr<ID3D12DescriptorHeap> EfgInternal::CreateDescriptorHeap(uint32_t numDescr
     return heap;
 }
 
-EfgResult EfgInternal::CreateRootSignature(uint32_t numCbv, uint32_t numSrv)
+EfgResult EfgInternal::CreateRootSignature(uint32_t numCbv, uint32_t numSrv, uint32_t numSampler)
 {
     std::vector<D3D12_ROOT_PARAMETER> rootParameters;
     std::vector<D3D12_DESCRIPTOR_RANGE> descriptorRanges;
-    descriptorRanges.reserve(2);
+    descriptorRanges.reserve(3);
 
     // Define descriptor range for CBV if needed
     if (numCbv > 0)
@@ -440,6 +465,24 @@ EfgResult EfgInternal::CreateRootSignature(uint32_t numCbv, uint32_t numSrv)
         srvRootParameter.DescriptorTable.pDescriptorRanges = &descriptorRanges.back();
         srvRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         rootParameters.push_back(srvRootParameter);
+    }
+
+    if (numSampler > 0)
+    {
+        D3D12_DESCRIPTOR_RANGE samplerDescriptorRange = {};
+        samplerDescriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+        samplerDescriptorRange.NumDescriptors = numSampler;
+        samplerDescriptorRange.BaseShaderRegister = 0;
+        samplerDescriptorRange.RegisterSpace = 0;
+        samplerDescriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+        descriptorRanges.push_back(samplerDescriptorRange);
+
+        D3D12_ROOT_PARAMETER samplerRootParameter = {};
+        samplerRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        samplerRootParameter.DescriptorTable.NumDescriptorRanges = 1;
+        samplerRootParameter.DescriptorTable.pDescriptorRanges = &descriptorRanges.back();
+        samplerRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        rootParameters.push_back(samplerRootParameter);
     }
 
     // Create the root signature description
@@ -531,6 +574,18 @@ EfgResult EfgInternal::CreateCBVDescriptorHeap(uint32_t numDescriptors)
     return EfgResult_NoError;
 }
 
+void EfgInternal::CreateSamplerDescriptorHeap(uint32_t samplerCount)
+{
+    if (samplerCount > 0)
+    {
+        D3D12_DESCRIPTOR_HEAP_DESC samplerHeapDesc = {};
+        samplerHeapDesc.NumDescriptors = samplerCount;
+        samplerHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
+        samplerHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        EFG_D3D_TRY(m_device->CreateDescriptorHeap(&samplerHeapDesc, IID_PPV_ARGS(&m_samplerHeap)));
+    }
+}
+
 EfgResult EfgInternal::CreateConstantBufferView(EfgConstantBuffer* buffer, uint32_t heapOffset)
 {
     if (!m_cbvSrvHeap)
@@ -564,11 +619,34 @@ EfgResult EfgInternal::CreateStructuredBufferView(EfgStructuredBuffer* buffer, u
     return EfgResult_NoError;
 }
 
+void EfgInternal::CreateTextureView(EfgTexture* texture, uint32_t heapOffset)
+{
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Format = texture->resource.Get()->GetDesc().Format;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Texture2D.MostDetailedMip = 0;
+    srvDesc.Texture2D.MipLevels = texture->resource.Get()->GetDesc().MipLevels;
+    srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+    texture->srvHandle = m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart();
+    texture->srvHandle.Offset(heapOffset, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
+
+    m_device->CreateShaderResourceView(texture->resource.Get(), &srvDesc, texture->srvHandle);
+}
+
+void EfgInternal::CommitSampler(EfgSampler* sampler, uint32_t heapOffset)
+{
+    CD3DX12_CPU_DESCRIPTOR_HANDLE samplerHandle(m_samplerHeap->GetCPUDescriptorHandleForHeapStart());
+    samplerHandle.Offset(heapOffset, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
+    m_device->CreateSampler(&sampler->desc, samplerHandle);
+}
+
 EfgResult EfgInternal::CommitShaderResources()
 {
     CreateCBVDescriptorHeap(m_cbvDescriptorCount + m_srvDescriptorCount);
+    CreateSamplerDescriptorHeap(m_samplerCount);
     if (!m_rootSignature)
-        CreateRootSignature(m_cbvDescriptorCount, m_srvDescriptorCount);
+        CreateRootSignature(m_cbvDescriptorCount, m_srvDescriptorCount, m_samplerCount);
 
     uint32_t heapOffset = 0;
     for (EfgConstantBuffer* buffer : m_constantBuffers) {
@@ -580,6 +658,17 @@ EfgResult EfgInternal::CommitShaderResources()
         CreateStructuredBufferView(buffer, heapOffset);
         heapOffset++;
     }
+
+    for (EfgTexture* texture : m_textures) {
+        CreateTextureView(texture, heapOffset);
+        heapOffset++;
+    }
+
+    heapOffset = 0;
+    for (EfgSampler* sampler : m_samplers) {
+        CommitSampler(sampler, heapOffset);
+        heapOffset++;
+    }
     return EfgResult_NoError;
 }
 
@@ -587,7 +676,7 @@ void EfgInternal::bindDescriptorHeaps()
 {
     if (m_cbvSrvHeap)
     {
-        ID3D12DescriptorHeap* descriptorHeaps[] = { m_cbvSrvHeap.Get() };
+        ID3D12DescriptorHeap* descriptorHeaps[] = { m_cbvSrvHeap.Get(), m_samplerHeap.Get() };
         m_commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
         CD3DX12_GPU_DESCRIPTOR_HANDLE cbvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 0, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
@@ -595,6 +684,9 @@ void EfgInternal::bindDescriptorHeaps()
 
         CD3DX12_GPU_DESCRIPTOR_HANDLE srvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), m_cbvDescriptorCount, m_cbvDescriptorSize);
         m_commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
+
+        CD3DX12_GPU_DESCRIPTOR_HANDLE samplerHandle(m_samplerHeap->GetGPUDescriptorHandleForHeapStart());
+        m_commandList->SetGraphicsRootDescriptorTable(2, samplerHandle);
     }
 }
 
@@ -864,6 +956,39 @@ void EfgInternal::CreateStructuredBuffer(EfgStructuredBuffer& buffer, void const
     m_srvDescriptorCount++;
 }
 
+void EfgInternal::CreateTexture2D(EfgTexture& texture, const wchar_t* filename)
+{
+    ResourceUploadBatch resourceUpload(m_device.Get());
+    resourceUpload.Begin();
+    EFG_D3D_TRY(CreateWICTextureFromFile(m_device.Get(), resourceUpload, filename, texture.resource.ReleaseAndGetAddressOf()));
+    auto uploadResourcesFinished = resourceUpload.End(m_commandQueue.Get());
+    uploadResourcesFinished.wait();
+    m_textures.push_back(&texture);
+    m_srvDescriptorCount++;
+}
+
+void EfgInternal::CreateSampler(EfgSampler& sampler)
+{
+    sampler.desc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    sampler.desc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    sampler.desc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    sampler.desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    sampler.desc.MipLODBias = 0.0f;
+    sampler.desc.MaxAnisotropy = 1;
+    sampler.desc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    sampler.desc.BorderColor[0] = 1.0f;
+    sampler.desc.BorderColor[1] = 1.0f;
+    sampler.desc.BorderColor[2] = 1.0f;
+    sampler.desc.BorderColor[3] = 1.0f;
+    sampler.desc.MinLOD = 0.0f;
+    sampler.desc.MaxLOD = D3D12_FLOAT32_MAX;
+
+    m_samplers.push_back(&sampler);
+    
+    m_samplerCount++;
+
+}
+
 void EfgInternal::updateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size)
 {
     void* mappedData = nullptr;
@@ -916,7 +1041,7 @@ EfgPSO EfgInternal::CreateGraphicsPipelineState(EfgProgram program)
     };
 
     if (!m_rootSignature)
-        CreateRootSignature(0, 0);
+        CreateRootSignature(0, 0, 0);
 
     // Describe and create the graphics pipeline state object (PSO).
     pso.desc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };

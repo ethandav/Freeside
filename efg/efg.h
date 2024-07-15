@@ -141,6 +141,7 @@ public:
     void SetPipelineState(EfgPSO pso);
     void DrawInstanced(uint32_t vertexCount);
     void DrawIndexedInstanced(uint32_t indexCount);
+    void Frame();
     void Render();
     void Destroy();
     void CheckD3DErrors();
@@ -239,6 +240,7 @@ EfgResult efgSetPipelineState(EfgContext efg, EfgPSO pso);
 EfgResult efgDrawInstanced(EfgContext efg, uint32_t vertexCount);
 EfgResult efgDrawIndexedInstanced(EfgContext efg, uint32_t indexCount);
 EfgResult efgRender(EfgContext efg);
+EfgResult efgFrame(EfgContext context);
 XMMATRIX efgCreateTransformMatrix(XMFLOAT3 translation, XMFLOAT3 rotation, XMFLOAT3 scale);
 
 template<typename TYPE>

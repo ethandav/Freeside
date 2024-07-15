@@ -218,6 +218,18 @@ EfgResult efgDrawIndexedInstanced(EfgContext context, uint32_t indexCount)
     return EfgResult_NoError;
 }
 
+EfgResult efgFrame(EfgContext context)
+{
+    EfgInternal* efg = EfgInternal::GetEfg(context);
+    if (!efg)
+    {
+        EFG_SHOW_ERROR("Cannot begin frame: Invalid context");
+        return EfgResult_InvalidContext;
+    }
+    EFG_INTERNAL_TRY(efg->Frame());
+    return EfgResult_NoError;
+}
+
 XMMATRIX efgCreateTransformMatrix(XMFLOAT3 translation, XMFLOAT3 rotation, XMFLOAT3 scale)
 {
     XMVECTOR rotationRadians = XMVectorSet(XMConvertToRadians(rotation.x), XMConvertToRadians(rotation.y), XMConvertToRadians(rotation.z), 0.0f);
@@ -568,6 +580,38 @@ void EfgInternal::LoadAssets()
     }
 }
 
+void EfgInternal::Frame()
+{
+    // Command list allocators can only be reset when the associated 
+    // command lists have finished execution on the GPU; apps should use 
+    // fences to determine GPU execution progress.
+    EFG_D3D_TRY(m_commandAllocator->Reset());
+
+    // However, when ExecuteCommandList() is called on a particular command 
+    // list, that command list can then be reset at any time and must be before 
+    // re-recording.
+    EFG_D3D_TRY(m_commandList->Reset(m_commandAllocator.Get(), m_boundPSO.pipelineState.Get()));
+
+    // Set necessary state.
+    //m_commandList->SetGraphicsRootSignature(m_boundPSO.rootSignature.Get());
+    m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+    m_commandList->RSSetViewports(1, &m_viewport);
+    m_commandList->RSSetScissorRects(1, &m_scissorRect);
+
+    m_commandList->SetPipelineState(m_boundPSO.pipelineState.Get());
+
+    // Indicate that the back buffer will be used as a render target.
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+    m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+
+    // Record commands.
+    const float clearColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+}
+
 void EfgInternal::Render()
 {
     // Indicate that the back buffer will now be used to present.
@@ -765,40 +809,10 @@ void EfgInternal::DrawInstanced(uint32_t vertexCount)
 
 void EfgInternal::DrawIndexedInstanced(uint32_t indexCount)
 {
-    // Command list allocators can only be reset when the associated 
-    // command lists have finished execution on the GPU; apps should use 
-    // fences to determine GPU execution progress.
-    EFG_D3D_TRY(m_commandAllocator->Reset());
-
-    // However, when ExecuteCommandList() is called on a particular command 
-    // list, that command list can then be reset at any time and must be before 
-    // re-recording.
-    EFG_D3D_TRY(m_commandList->Reset(m_commandAllocator.Get(), m_boundPSO.pipelineState.Get()));
-
-    // Set necessary state.
-    //m_commandList->SetGraphicsRootSignature(m_boundPSO.rootSignature.Get());
-    m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
-    m_commandList->RSSetViewports(1, &m_viewport);
-    m_commandList->RSSetScissorRects(1, &m_scissorRect);
-
     bindDescriptorHeaps();
-
-    // Indicate that the back buffer will be used as a render target.
-    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
-    m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
-
-    // Record commands.
-    const float clearColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_commandList->IASetVertexBuffers(0, 1, &m_boundVertexBuffer.view);
     m_commandList->IASetIndexBuffer(&m_boundIndexBuffer.view);
     m_commandList->DrawIndexedInstanced(indexCount, 1, 0, 0, 0);
-
-    m_boundVertexBuffer = {};
-    m_boundIndexBuffer = {};
 }
 
 void EfgInternal::Destroy()

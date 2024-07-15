@@ -47,6 +47,7 @@ int main()
 
     Shape square = Shapes::getShape(Shapes::SPHERE);
     XMMATRIX transformMatrix = efgCreateTransformMatrix(XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f));
+    XMMATRIX transformMatrix2 = efgCreateTransformMatrix(XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f));
 
     struct LightBuffer
     {
@@ -110,18 +111,22 @@ int main()
     efgCommitShaderResources(efg);
     EfgProgram program = efgCreateProgram(efg, L"shaders.hlsl");
     EfgPSO pso = efgCreateGraphicsPipelineState(efg, program);
+    efgSetPipelineState(efg, pso);
 
     while (efgWindowIsRunning(efgWindow))
     {
         efgWindowPumpEvents(efgWindow);
+        efgFrame(efg);
         efgUpdateCamera(efg, efgWindow, camera);
         efgUpdateConstantBuffer(efg, viewProjBuffer, &camera.viewProj, sizeof(camera.viewProj));
         efgUpdateConstantBuffer(efg, viewPosBuffer, &camera.eye, sizeof(camera.eye));
         efgBindVertexBuffer(efg, vertexBuffer);
         efgBindIndexBuffer(efg, indexBuffer);
         efgBind2DTexture(efg, texture);
-        efgSetPipelineState(efg, pso);
         efgDrawIndexedInstanced(efg, square.indexCount);
+        efgBind2DTexture(efg, texture2);
+        efgDrawIndexedInstanced(efg, square.indexCount);
+
         efgRender(efg);
     }
 

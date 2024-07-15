@@ -119,7 +119,7 @@ int main()
         efgUpdateConstantBuffer(efg, viewPosBuffer, &camera.eye, sizeof(camera.eye));
         efgBindVertexBuffer(efg, vertexBuffer);
         efgBindIndexBuffer(efg, indexBuffer);
-        efgBind2DTexture(efg, texture2);
+        efgBind2DTexture(efg, texture);
         efgSetPipelineState(efg, pso);
         efgDrawIndexedInstanced(efg, square.indexCount);
         efgRender(efg);

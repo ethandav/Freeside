@@ -87,9 +87,10 @@ PSInput VSMain(VSInput input)
     return result;
 }
 
-float3 calculatePointLight(LightData light, float3 normal, float3 fragPos, float3 viewDir)
-{
+float3 calculatePointLight(LightData light, float3 normal, float3 fragPos, float3 viewDir, float2 uv)
+{ 
     // Diffuse
+    float3 texDiffuse = diffuseMap.Sample(textureSampler, uv).xyz;
     float3 lightDir = normalize(light.position.xyz - fragPos);
     float diff = max(dot(normal, lightDir), 0.0);
 
@@ -102,8 +103,8 @@ float3 calculatePointLight(LightData light, float3 normal, float3 fragPos, float
     float attenuation = 1.0 / (light.attenuation.x + light.attenuation.y * distance + light.attenuation.z * (distance * distance));
 
     // Material
-    float3 ambient = (light.ambient * light.color) * material.ambient;
-    float3 diffuse = (light.diffuse.xyz * light.color.xyz) * (diff * material.diffuse.xyz);
+    float3 ambient = (light.ambient * light.color).xyz * texDiffuse;
+    float3 diffuse = (light.diffuse.xyz * light.color.xyz) * (diff * texDiffuse);
     float3 specular = light.specular.xyz * (spec * material.specular.xyz);
 
     ambient *= attenuation;
@@ -118,11 +119,11 @@ float4 PSMain(PSInput input) : SV_TARGET
     float3 normal = normalize(input.normal);
     float3 viewDir = normalize(viewPos - input.fragPos);
     
-    float3 color = diffuseMap.Sample(textureSampler, input.uv);
+    float3 color;
 
     for (uint i = 0; i < lightCount; ++i)
     {
-        color += calculatePointLight(lights[i], normal, input.fragPos, viewDir);
+        color += calculatePointLight(lights[i], normal, input.fragPos, viewDir, input.uv);
     }
     return float4(color, 1.0f);
 }

@@ -101,6 +101,8 @@ int main()
 
     EfgTexture texture;
     efgCreateTexture2D(efg, texture, L"earth.jpeg");
+    EfgTexture texture2;
+    efgCreateTexture2D(efg, texture2, L"water.jpg");
 
     EfgSampler sampler;
     efgCreateSampler(efg, sampler);
@@ -117,6 +119,7 @@ int main()
         efgUpdateConstantBuffer(efg, viewPosBuffer, &camera.eye, sizeof(camera.eye));
         efgBindVertexBuffer(efg, vertexBuffer);
         efgBindIndexBuffer(efg, indexBuffer);
+        efgBind2DTexture(efg, texture2);
         efgSetPipelineState(efg, pso);
         efgDrawIndexedInstanced(efg, square.indexCount);
         efgRender(efg);

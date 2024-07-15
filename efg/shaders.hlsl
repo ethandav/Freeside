@@ -50,7 +50,7 @@ struct LightData
 };
 StructuredBuffer<LightData> lights : register(t0);
 
-Texture2D mytexture : register(t1);
+Texture2D diffuseMap: register(t1);
 SamplerState textureSampler : register(s0);
 
 cbuffer LightConstants : register(b4)
@@ -118,7 +118,7 @@ float4 PSMain(PSInput input) : SV_TARGET
     float3 normal = normalize(input.normal);
     float3 viewDir = normalize(viewPos - input.fragPos);
     
-    float3 color = mytexture.Sample(textureSampler, input.uv);
+    float3 color = diffuseMap.Sample(textureSampler, input.uv);
 
     for (uint i = 0; i < lightCount; ++i)
     {

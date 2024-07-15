@@ -86,6 +86,7 @@ struct EfgStructuredBuffer: public EfgBuffer
 
 struct EfgTexture
 {
+    uint32_t index = 0;
     ComPtr<ID3D12Resource> resource;
     D3D12_SHADER_RESOURCE_VIEW_DESC viewDesc = {};
     CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle = {};
@@ -133,6 +134,7 @@ public:
     void updateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size);
     void BindVertexBuffer(EfgVertexBuffer buffer);
     void BindIndexBuffer(EfgIndexBuffer buffer);
+    void Bind2DTexture(const EfgTexture& texture);
     EfgResult CommitShaderResources();
     EfgProgram CreateProgram(LPCWSTR fileName);
     EfgPSO CreateGraphicsPipelineState(EfgProgram program);
@@ -156,7 +158,7 @@ private:
 
     void CompileProgram(EfgProgram& program);
     ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type);
-    EfgResult CreateRootSignature(uint32_t numCbv, uint32_t numSrv, uint32_t numSampler);
+    EfgResult CreateRootSignature(uint32_t numCbv, uint32_t numSrv, uint32_t numSampler, uint32_t numTextures);
     void bindDescriptorHeaps();
 
     void ResetCommandList();
@@ -167,7 +169,7 @@ private:
     void CopyBuffer(ComPtr<ID3D12Resource> dest, ComPtr<ID3D12Resource> src, UINT size, D3D12_RESOURCE_STATES current, D3D12_RESOURCE_STATES final);
     ComPtr<ID3D12Resource> CreateBufferResource(EFG_CPU_ACCESS cpuAccess, UINT size);
     void TransitionResourceState(ComPtr<ID3D12Resource>& resource, D3D12_RESOURCE_STATES currentState, D3D12_RESOURCE_STATES newState);
-    EfgResult CreateCBVDescriptorHeap(uint32_t numDescriptors);
+    EfgResult CreateCbvSrvDescriptorHeap(uint32_t numDescriptors);
     void CreateSamplerDescriptorHeap(uint32_t samplerCount);
     EfgResult CreateConstantBufferView(EfgConstantBuffer* buffer, uint32_t heapOffset);
     EfgResult CreateStructuredBufferView(EfgStructuredBuffer* buffer, uint32_t heapOffset);
@@ -196,10 +198,10 @@ private:
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
     ComPtr<ID3D12RootSignature> m_rootSignature;
     UINT m_rtvDescriptorSize = 0;
-    UINT m_cbvDescriptorSize = 0;
-    UINT m_srvDescriptorSize = 0;
+    UINT m_cbvSrvDescriptorSize = 0;
     uint32_t m_cbvDescriptorCount = 0;
     uint32_t m_srvDescriptorCount = 0;
+    uint32_t m_textureCount = 0;
     uint32_t m_samplerCount = 0;
     std::list<EfgConstantBuffer*> m_constantBuffers = {};
     std::list<EfgStructuredBuffer*> m_structuredBuffers = {};
@@ -209,6 +211,7 @@ private:
     EfgPSO m_boundPSO = {};
     EfgVertexBuffer m_boundVertexBuffer = {};
     EfgIndexBuffer m_boundIndexBuffer = {};
+    const EfgTexture* m_boundTexture = nullptr;
 
     // Synchronization objects.
     UINT m_frameIndex = 0;
@@ -221,6 +224,7 @@ EfgContext efgCreateContext(HWND window);
 EfgResult efgDestroyContext(EfgContext context);
 EfgResult efgBindVertexBuffer(EfgContext context, EfgVertexBuffer buffer);
 EfgResult efgBindIndexBuffer(EfgContext context, EfgIndexBuffer buffer);
+EfgResult efgBind2DTexture(EfgContext context, const EfgTexture& texture);
 EfgVertexBuffer efgCreateVertexBuffer(EfgContext context, void const* data, UINT size);
 EfgIndexBuffer efgCreateIndexBuffer(EfgContext context, void const* data, UINT size);
 EfgResult efgCreateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size);

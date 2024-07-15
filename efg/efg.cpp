@@ -182,6 +182,18 @@ EfgResult efgBindIndexBuffer(EfgContext context, EfgIndexBuffer buffer)
     return EfgResult_NoError;
 }
 
+EfgResult efgBind2DTexture(EfgContext context, const EfgTexture& texture)
+{
+    EfgInternal* efg = EfgInternal::GetEfg(context);
+    if (!efg)
+    {
+        EFG_SHOW_ERROR("Cannot bind 2D Texture: Invalid context");
+        return EfgResult_InvalidContext;
+    }
+    EFG_INTERNAL_TRY(efg->Bind2DTexture(texture));
+    return EfgResult_NoError;
+}
+
 EfgResult efgDrawInstanced(EfgContext context, uint32_t vertexCount)
 {
     EfgInternal* efg = EfgInternal::GetEfg(context);
@@ -423,11 +435,11 @@ ComPtr<ID3D12DescriptorHeap> EfgInternal::CreateDescriptorHeap(uint32_t numDescr
     return heap;
 }
 
-EfgResult EfgInternal::CreateRootSignature(uint32_t numCbv, uint32_t numSrv, uint32_t numSampler)
+EfgResult EfgInternal::CreateRootSignature(uint32_t numCbv, uint32_t numSrv, uint32_t numSampler, uint32_t numTextures)
 {
     std::vector<D3D12_ROOT_PARAMETER> rootParameters;
     std::vector<D3D12_DESCRIPTOR_RANGE> descriptorRanges;
-    descriptorRanges.reserve(3);
+    descriptorRanges.reserve(4);
 
     // Define descriptor range for CBV if needed
     if (numCbv > 0)
@@ -465,6 +477,24 @@ EfgResult EfgInternal::CreateRootSignature(uint32_t numCbv, uint32_t numSrv, uin
         srvRootParameter.DescriptorTable.pDescriptorRanges = &descriptorRanges.back();
         srvRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         rootParameters.push_back(srvRootParameter);
+    }
+
+    if (numTextures > 0)
+    {
+        D3D12_DESCRIPTOR_RANGE texDescriptorRange = {};
+        texDescriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        texDescriptorRange.NumDescriptors = 1;
+        texDescriptorRange.BaseShaderRegister = numSrv;
+        texDescriptorRange.RegisterSpace = 0;
+        texDescriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+        descriptorRanges.push_back(texDescriptorRange);
+
+        D3D12_ROOT_PARAMETER texRootParameter = {};
+        texRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        texRootParameter.DescriptorTable.NumDescriptorRanges = 1;
+        texRootParameter.DescriptorTable.pDescriptorRanges = &descriptorRanges.back();
+        texRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        rootParameters.push_back(texRootParameter);
     }
 
     if (numSampler > 0)
@@ -559,7 +589,7 @@ void EfgInternal::ExecuteCommandList()
     m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 }
 
-EfgResult EfgInternal::CreateCBVDescriptorHeap(uint32_t numDescriptors)
+EfgResult EfgInternal::CreateCbvSrvDescriptorHeap(uint32_t numDescriptors)
 {
     if (numDescriptors > 0)
     {
@@ -569,7 +599,7 @@ EfgResult EfgInternal::CreateCBVDescriptorHeap(uint32_t numDescriptors)
         heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         EFG_D3D_TRY(m_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_cbvSrvHeap)));
 
-        m_cbvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        m_cbvSrvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
     return EfgResult_NoError;
 }
@@ -643,10 +673,10 @@ void EfgInternal::CommitSampler(EfgSampler* sampler, uint32_t heapOffset)
 
 EfgResult EfgInternal::CommitShaderResources()
 {
-    CreateCBVDescriptorHeap(m_cbvDescriptorCount + m_srvDescriptorCount);
+    CreateCbvSrvDescriptorHeap(m_cbvDescriptorCount + m_srvDescriptorCount + m_textureCount);
     CreateSamplerDescriptorHeap(m_samplerCount);
     if (!m_rootSignature)
-        CreateRootSignature(m_cbvDescriptorCount, m_srvDescriptorCount, m_samplerCount);
+        CreateRootSignature(m_cbvDescriptorCount, m_srvDescriptorCount, m_samplerCount, m_textureCount);
 
     uint32_t heapOffset = 0;
     for (EfgConstantBuffer* buffer : m_constantBuffers) {
@@ -679,14 +709,21 @@ void EfgInternal::bindDescriptorHeaps()
         ID3D12DescriptorHeap* descriptorHeaps[] = { m_cbvSrvHeap.Get(), m_samplerHeap.Get() };
         m_commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
-        CD3DX12_GPU_DESCRIPTOR_HANDLE cbvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 0, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
+        CD3DX12_GPU_DESCRIPTOR_HANDLE cbvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 0, m_cbvSrvDescriptorSize);
         m_commandList->SetGraphicsRootDescriptorTable(0, cbvGpuHandle);
 
-        CD3DX12_GPU_DESCRIPTOR_HANDLE srvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), m_cbvDescriptorCount, m_cbvDescriptorSize);
+        CD3DX12_GPU_DESCRIPTOR_HANDLE srvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), m_cbvDescriptorCount, m_cbvSrvDescriptorSize);
         m_commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
 
+        if (m_boundTexture)
+        {
+            uint32_t offset = m_cbvDescriptorCount + m_srvDescriptorCount + m_boundTexture->index;
+            CD3DX12_GPU_DESCRIPTOR_HANDLE srvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), offset, m_cbvSrvDescriptorSize);
+            m_commandList->SetGraphicsRootDescriptorTable(2, srvGpuHandle);
+        }
+
         CD3DX12_GPU_DESCRIPTOR_HANDLE samplerHandle(m_samplerHeap->GetGPUDescriptorHandleForHeapStart());
-        m_commandList->SetGraphicsRootDescriptorTable(2, samplerHandle);
+        m_commandList->SetGraphicsRootDescriptorTable(3, samplerHandle);
     }
 }
 
@@ -963,8 +1000,9 @@ void EfgInternal::CreateTexture2D(EfgTexture& texture, const wchar_t* filename)
     EFG_D3D_TRY(CreateWICTextureFromFile(m_device.Get(), resourceUpload, filename, texture.resource.ReleaseAndGetAddressOf()));
     auto uploadResourcesFinished = resourceUpload.End(m_commandQueue.Get());
     uploadResourcesFinished.wait();
+    texture.index = m_textureCount;
     m_textures.push_back(&texture);
-    m_srvDescriptorCount++;
+    m_textureCount++;
 }
 
 void EfgInternal::CreateSampler(EfgSampler& sampler)
@@ -1041,7 +1079,7 @@ EfgPSO EfgInternal::CreateGraphicsPipelineState(EfgProgram program)
     };
 
     if (!m_rootSignature)
-        CreateRootSignature(0, 0, 0);
+        CreateRootSignature(0, 0, 0, 0);
 
     // Describe and create the graphics pipeline state object (PSO).
     pso.desc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
@@ -1073,8 +1111,12 @@ void EfgInternal::BindVertexBuffer(EfgVertexBuffer buffer)
 
 void EfgInternal::BindIndexBuffer(EfgIndexBuffer buffer)
 {
-
     m_boundIndexBuffer = buffer;
+}
+
+void EfgInternal::Bind2DTexture(const EfgTexture& texture)
+{
+    m_boundTexture = &texture;
 }
 
 void EfgInternal::CompileProgram(EfgProgram& program)

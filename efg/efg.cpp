@@ -373,6 +373,9 @@ void EfgContext::Frame()
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
     m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
+    ID3D12DescriptorHeap* descriptorHeaps[] = { m_cbvSrvHeap.Get(), m_samplerHeap.Get() };
+    m_commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
     // Record commands.
     const float clearColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
     m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
@@ -538,43 +541,14 @@ void EfgContext::bindDescriptorHeaps()
 
 void EfgContext::DrawInstanced(uint32_t vertexCount)
 {
-    // Command list allocators can only be reset when the associated 
-    // command lists have finished execution on the GPU; apps should use 
-    // fences to determine GPU execution progress.
-    EFG_D3D_TRY(m_commandAllocator->Reset());
-
-    // However, when ExecuteCommandList() is called on a particular command 
-    // list, that command list can then be reset at any time and must be before 
-    // re-recording.
-    EFG_D3D_TRY(m_commandList->Reset(m_commandAllocator.Get(), m_boundPSO.pipelineState.Get()));
-
-    // Set necessary state.
-    //m_commandList->SetGraphicsRootSignature(m_boundPSO.rootSignature.Get());
-    m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
-    m_commandList->RSSetViewports(1, &m_viewport);
-    m_commandList->RSSetScissorRects(1, &m_scissorRect);
-
-    bindDescriptorHeaps();
-
-    // Indicate that the back buffer will be used as a render target.
-    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
-    m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
-
-    // Record commands.
-    const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-    m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    //bindDescriptorHeaps();
     m_commandList->IASetVertexBuffers(0, 1, &m_boundVertexBuffer.view);
     m_commandList->DrawInstanced(vertexCount, 1, 0, 0);
-
-    m_boundVertexBuffer = {};
 }
 
 void EfgContext::DrawIndexedInstanced(uint32_t indexCount)
 {
-    bindDescriptorHeaps();
+    //bindDescriptorHeaps();
     m_commandList->IASetVertexBuffers(0, 1, &m_boundVertexBuffer.view);
     m_commandList->IASetIndexBuffer(&m_boundIndexBuffer.view);
     m_commandList->DrawIndexedInstanced(indexCount, 1, 0, 0, 0);
@@ -991,4 +965,31 @@ void EfgContext::CreateRootSignature(EfgRootSignature& rootSignature)
 {
     ComPtr<ID3DBlob> serializedRootSignature = rootSignature.Serialize();
     ThrowIfFailed(m_device->CreateRootSignature(0, serializedRootSignature->GetBufferPointer(), serializedRootSignature->GetBufferSize(), IID_PPV_ARGS(&rootSignature.Get())));
+}
+
+void EfgContext::BindRootDescriptorTable(EfgRootSignature& rootSignature)
+{
+    //uint32_t offset = 0;
+    //for (int i = 0; i < rootSignature.rootParameters.size() - 1; i++)
+    //{
+    //    CD3DX12_GPU_DESCRIPTOR_HANDLE cbvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 5, m_cbvSrvDescriptorSize);
+    //    m_commandList->SetGraphicsRootDescriptorTable(1, cbvGpuHandle);
+    //    offset += rootSignature.parameterSizes[i];
+    //}
+
+    //CD3DX12_GPU_DESCRIPTOR_HANDLE cbvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 0, m_cbvSrvDescriptorSize);
+    //m_commandList->SetGraphicsRootDescriptorTable(0, cbvGpuHandle);
+    
+    //CD3DX12_GPU_DESCRIPTOR_HANDLE srvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), m_cbvDescriptorCount, m_cbvSrvDescriptorSize);
+    //m_commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
+    
+    //if (m_boundTexture)
+    //{
+    //    uint32_t offset = m_cbvDescriptorCount + m_srvDescriptorCount + m_boundTexture->index;
+    //    CD3DX12_GPU_DESCRIPTOR_HANDLE srvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), offset, m_cbvSrvDescriptorSize);
+    //    m_commandList->SetGraphicsRootDescriptorTable(2, srvGpuHandle);
+    //}
+    
+    //CD3DX12_GPU_DESCRIPTOR_HANDLE samplerHandle(m_samplerHeap->GetGPUDescriptorHandleForHeapStart());
+    //m_commandList->SetGraphicsRootDescriptorTable(3, samplerHandle);
 }

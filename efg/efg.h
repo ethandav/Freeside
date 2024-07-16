@@ -128,8 +128,10 @@ class EfgDescriptorRange
 {
 public:
     EfgDescriptorRange(EFG_RANGE_TYPE type, uint32_t baseRegister) : rangeType(type), baseShaderRegister(baseRegister) {};
-    template<typename TYPE> void insert(TYPE& resource) { resource.registerIndex = baseShaderRegister + (uint32_t)resources.size(); resources.push_back(&resource); };
+    template<typename TYPE> void insert(TYPE& resource) { resource.registerIndex = baseShaderRegister + (uint32_t)resources.size(); resources.push_back(&resource); resourceCount++; };
     D3D12_DESCRIPTOR_RANGE Commit();
+
+    uint32_t resourceCount = 0;
 private:
     EFG_RANGE_TYPE rangeType;
     uint32_t baseShaderRegister = 0;
@@ -139,8 +141,9 @@ private:
 class EfgRootParameter
 {
 public:
-    void insert(EfgDescriptorRange& range) { ranges.push_back(range.Commit()); };
+    void insert(EfgDescriptorRange& range) { ranges.push_back(range.Commit()); size += range.resourceCount; };
     D3D12_ROOT_PARAMETER Commit();
+    uint32_t size = 0;
 private:
     std::vector<D3D12_DESCRIPTOR_RANGE> ranges;
 };
@@ -148,11 +151,12 @@ private:
 class EfgRootSignature
 {
 public:
-    void insert(EfgRootParameter& parameter) { rootParameters.push_back(parameter.Commit()); };
+    void insert(EfgRootParameter& parameter) { rootParameters.push_back(parameter.Commit()); parameterSizes.push_back(parameter.size); };
     ComPtr<ID3DBlob> Serialize();
     ComPtr<ID3D12RootSignature>& Get() { return rootSignature; }
-private:
+    std::vector<uint32_t> parameterSizes = {};
     std::vector<D3D12_ROOT_PARAMETER> rootParameters = {};
+private:
     D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
     ComPtr<ID3D12RootSignature> rootSignature;
 
@@ -173,6 +177,7 @@ public:
     void BindVertexBuffer(EfgVertexBuffer buffer);
     void BindIndexBuffer(EfgIndexBuffer buffer);
     void Bind2DTexture(const EfgTexture& texture);
+    void BindRootDescriptorTable(EfgRootSignature& rootSignature);
     EfgResult CommitShaderResources();
     EfgProgram CreateProgram(LPCWSTR fileName);
     EfgPSO CreateGraphicsPipelineState(EfgProgram program, EfgRootSignature& rootSignature);

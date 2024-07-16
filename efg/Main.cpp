@@ -61,9 +61,9 @@ int main()
     };
     std::vector<LightBuffer> lights(2);
     lights[0].position = XMFLOAT4(30.0f, 0.0f, 0.0f, 0.0f);
-    //lights[0].color = XMFLOAT4(0.0f, 0.0f, 1.0f, 0.0f);
+    lights[0].color = XMFLOAT4(0.0f, 0.0f, 1.0f, 0.0f);
     lights[1].position = XMFLOAT4(-30.0f, 0.0f, 0.0f, 0.0f);
-    //lights[1].color = XMFLOAT4(1.0f, 0.0f, 0.0f, 0.0f);
+    lights[1].color = XMFLOAT4(1.0f, 0.0f, 0.0f, 0.0f);
 
     struct LightConstants
     {
@@ -149,8 +149,9 @@ int main()
     while (efgWindowIsRunning(efgWindow))
     {
         efgWindowPumpEvents(efgWindow);
-        efg.Frame();
         efgUpdateCamera(efg, efgWindow, camera);
+        efg.Frame();
+        efg.BindRootDescriptorTable(rootSignature);
         efg.UpdateConstantBuffer(viewProjBuffer, &camera.viewProj, sizeof(camera.viewProj));
         efg.UpdateConstantBuffer(viewPosBuffer, &camera.eye, sizeof(camera.eye));
         efg.BindVertexBuffer(vertexBuffer);

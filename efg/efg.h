@@ -229,8 +229,6 @@ private:
 
     void CompileProgram(EfgProgram& program);
     ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type);
-    EfgResult CreateRootSignature(uint32_t numCbv, uint32_t numSrv, uint32_t numSampler, uint32_t numTextures);
-    void bindDescriptorHeaps();
 
     void ResetCommandList();
     void ExecuteCommandList();
@@ -270,6 +268,7 @@ private:
     ComPtr<ID3D12RootSignature> m_rootSignature;
     UINT m_rtvDescriptorSize = 0;
     UINT m_cbvSrvDescriptorSize = 0;
+    UINT m_samplerDescriptorSize = 0;
     uint32_t m_cbvDescriptorCount = 0;
     uint32_t m_srvDescriptorCount = 0;
     uint32_t m_textureCount = 0;

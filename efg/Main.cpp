@@ -60,10 +60,11 @@ int main()
         XMFLOAT4 attenuation = XMFLOAT4(1.0f, 0.009f, 0.0032f, 0.0f);
     };
     std::vector<LightBuffer> lights(2);
-    lights[0].position = XMFLOAT4(30.0f, 0.0f, 0.0f, 0.0f);
-    lights[0].color = XMFLOAT4(0.0f, 0.0f, 1.0f, 0.0f);
-    lights[1].position = XMFLOAT4(-30.0f, 0.0f, 0.0f, 0.0f);
-    lights[1].color = XMFLOAT4(1.0f, 0.0f, 0.0f, 0.0f);
+    lights[0].position = XMFLOAT4(30.0f, 10.0f, 0.0f, 0.0f);
+    lights[0].color = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.0f);
+
+    lights[1].position = XMFLOAT4(-30.0f, 10.0f, 0.0f, 0.0f);
+    lights[1].color = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.0f);
 
     struct LightConstants
     {
@@ -158,7 +159,7 @@ int main()
         efg.BindIndexBuffer(indexBuffer);
         efg.Bind2DTexture(texture);
         efg.DrawIndexedInstanced(square.indexCount);
-        efg.Bind2DTexture(texture2);
+        //efg.Bind2DTexture(texture2);
         efg.DrawIndexedInstanced(square.indexCount);
 
         efg.Render();

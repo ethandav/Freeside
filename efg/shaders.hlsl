@@ -91,6 +91,7 @@ float3 calculatePointLight(LightData light, float3 normal, float3 fragPos, float
 { 
     // Diffuse
     float3 texDiffuse = diffuseMap.Sample(textureSampler, uv).xyz;
+    //float3 texDiffuse = material.diffuse;
     float3 lightDir = normalize(light.position.xyz - fragPos);
     float diff = max(dot(normal, lightDir), 0.0);
 

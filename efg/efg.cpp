@@ -214,111 +214,6 @@ ComPtr<ID3D12DescriptorHeap> EfgContext::CreateDescriptorHeap(uint32_t numDescri
     return heap;
 }
 
-EfgResult EfgContext::CreateRootSignature(uint32_t numCbv, uint32_t numSrv, uint32_t numSampler, uint32_t numTextures)
-{
-    std::vector<D3D12_ROOT_PARAMETER> rootParameters;
-    std::vector<D3D12_DESCRIPTOR_RANGE> descriptorRanges;
-    descriptorRanges.reserve(4);
-
-    // Define descriptor range for CBV if needed
-    if (numCbv > 0)
-    {
-        D3D12_DESCRIPTOR_RANGE cbvDescriptorRange = {};
-        cbvDescriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-        cbvDescriptorRange.NumDescriptors = numCbv;
-        cbvDescriptorRange.BaseShaderRegister = 0;
-        cbvDescriptorRange.RegisterSpace = 0;
-        cbvDescriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-        descriptorRanges.push_back(cbvDescriptorRange);
-
-        D3D12_ROOT_PARAMETER cbvRootParameter = {};
-        cbvRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        cbvRootParameter.DescriptorTable.NumDescriptorRanges = 1;
-        cbvRootParameter.DescriptorTable.pDescriptorRanges = &descriptorRanges.back();
-        cbvRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-        rootParameters.push_back(cbvRootParameter);
-    }
-
-    // Define descriptor range for SRV if needed
-    if (numSrv > 0)
-    {
-        D3D12_DESCRIPTOR_RANGE srvDescriptorRange = {};
-        srvDescriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        srvDescriptorRange.NumDescriptors = numSrv;
-        srvDescriptorRange.BaseShaderRegister = 0;
-        srvDescriptorRange.RegisterSpace = 0;
-        srvDescriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-        descriptorRanges.push_back(srvDescriptorRange);
-
-        D3D12_ROOT_PARAMETER srvRootParameter = {};
-        srvRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        srvRootParameter.DescriptorTable.NumDescriptorRanges = 1;
-        srvRootParameter.DescriptorTable.pDescriptorRanges = &descriptorRanges.back();
-        srvRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-        rootParameters.push_back(srvRootParameter);
-    }
-
-    if (numTextures > 0)
-    {
-        D3D12_DESCRIPTOR_RANGE texDescriptorRange = {};
-        texDescriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        texDescriptorRange.NumDescriptors = 1;
-        texDescriptorRange.BaseShaderRegister = numSrv;
-        texDescriptorRange.RegisterSpace = 0;
-        texDescriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-        descriptorRanges.push_back(texDescriptorRange);
-
-        D3D12_ROOT_PARAMETER texRootParameter = {};
-        texRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        texRootParameter.DescriptorTable.NumDescriptorRanges = 1;
-        texRootParameter.DescriptorTable.pDescriptorRanges = &descriptorRanges.back();
-        texRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-        rootParameters.push_back(texRootParameter);
-    }
-
-    if (numSampler > 0)
-    {
-        D3D12_DESCRIPTOR_RANGE samplerDescriptorRange = {};
-        samplerDescriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-        samplerDescriptorRange.NumDescriptors = numSampler;
-        samplerDescriptorRange.BaseShaderRegister = 0;
-        samplerDescriptorRange.RegisterSpace = 0;
-        samplerDescriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-        descriptorRanges.push_back(samplerDescriptorRange);
-
-        D3D12_ROOT_PARAMETER samplerRootParameter = {};
-        samplerRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        samplerRootParameter.DescriptorTable.NumDescriptorRanges = 1;
-        samplerRootParameter.DescriptorTable.pDescriptorRanges = &descriptorRanges.back();
-        samplerRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-        rootParameters.push_back(samplerRootParameter);
-    }
-
-    // Create the root signature description
-    D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-    rootSignatureDesc.NumParameters = static_cast<UINT>(rootParameters.size());
-    rootSignatureDesc.pParameters = rootParameters.data();
-    rootSignatureDesc.NumStaticSamplers = 0;
-    rootSignatureDesc.pStaticSamplers = nullptr;
-    rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-
-    // Serialize and create the root signature
-    ComPtr<ID3DBlob> serializedRootSignature;
-    ComPtr<ID3DBlob> errorBlob;
-    HRESULT hr = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &serializedRootSignature, &errorBlob);
-    if (FAILED(hr))
-    {
-        if (errorBlob)
-        {
-            OutputDebugStringA((char*)errorBlob->GetBufferPointer());
-        }
-        throw EfgException(hr);
-    }
-
-    EFG_D3D_TRY(m_device->CreateRootSignature(0, serializedRootSignature->GetBufferPointer(), serializedRootSignature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
-    return EfgResult_NoError;
-}
-
 void EfgContext::LoadAssets()
 {
     // Create the command list.
@@ -427,6 +322,8 @@ void EfgContext::CreateSamplerDescriptorHeap(uint32_t samplerCount)
         samplerHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
         samplerHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         EFG_D3D_TRY(m_device->CreateDescriptorHeap(&samplerHeapDesc, IID_PPV_ARGS(&m_samplerHeap)));
+
+        m_samplerDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
     }
 }
 
@@ -481,7 +378,7 @@ void EfgContext::CreateTextureView(EfgTexture* texture, uint32_t heapOffset)
 void EfgContext::CommitSampler(EfgSampler* sampler, uint32_t heapOffset)
 {
     CD3DX12_CPU_DESCRIPTOR_HANDLE samplerHandle(m_samplerHeap->GetCPUDescriptorHandleForHeapStart());
-    samplerHandle.Offset(heapOffset, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
+    samplerHandle.Offset(heapOffset, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER));
     m_device->CreateSampler(&sampler->desc, samplerHandle);
 }
 
@@ -514,41 +411,14 @@ EfgResult EfgContext::CommitShaderResources()
     return EfgResult_NoError;
 }
 
-void EfgContext::bindDescriptorHeaps()
-{
-    if (m_cbvSrvHeap)
-    {
-        ID3D12DescriptorHeap* descriptorHeaps[] = { m_cbvSrvHeap.Get(), m_samplerHeap.Get() };
-        m_commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
-
-        CD3DX12_GPU_DESCRIPTOR_HANDLE cbvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 0, m_cbvSrvDescriptorSize);
-        m_commandList->SetGraphicsRootDescriptorTable(0, cbvGpuHandle);
-
-        CD3DX12_GPU_DESCRIPTOR_HANDLE srvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), m_cbvDescriptorCount, m_cbvSrvDescriptorSize);
-        m_commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
-
-        if (m_boundTexture)
-        {
-            uint32_t offset = m_cbvDescriptorCount + m_srvDescriptorCount + m_boundTexture->index;
-            CD3DX12_GPU_DESCRIPTOR_HANDLE srvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), offset, m_cbvSrvDescriptorSize);
-            m_commandList->SetGraphicsRootDescriptorTable(2, srvGpuHandle);
-        }
-
-        CD3DX12_GPU_DESCRIPTOR_HANDLE samplerHandle(m_samplerHeap->GetGPUDescriptorHandleForHeapStart());
-        m_commandList->SetGraphicsRootDescriptorTable(3, samplerHandle);
-    }
-}
-
 void EfgContext::DrawInstanced(uint32_t vertexCount)
 {
-    //bindDescriptorHeaps();
     m_commandList->IASetVertexBuffers(0, 1, &m_boundVertexBuffer.view);
     m_commandList->DrawInstanced(vertexCount, 1, 0, 0);
 }
 
 void EfgContext::DrawIndexedInstanced(uint32_t indexCount)
 {
-    //bindDescriptorHeaps();
     m_commandList->IASetVertexBuffers(0, 1, &m_boundVertexBuffer.view);
     m_commandList->IASetIndexBuffer(&m_boundIndexBuffer.view);
     m_commandList->DrawIndexedInstanced(indexCount, 1, 0, 0, 0);
@@ -969,27 +839,27 @@ void EfgContext::CreateRootSignature(EfgRootSignature& rootSignature)
 
 void EfgContext::BindRootDescriptorTable(EfgRootSignature& rootSignature)
 {
-    //uint32_t offset = 0;
-    //for (int i = 0; i < rootSignature.rootParameters.size() - 1; i++)
-    //{
-    //    CD3DX12_GPU_DESCRIPTOR_HANDLE cbvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 5, m_cbvSrvDescriptorSize);
-    //    m_commandList->SetGraphicsRootDescriptorTable(1, cbvGpuHandle);
-    //    offset += rootSignature.parameterSizes[i];
-    //}
-
-    //CD3DX12_GPU_DESCRIPTOR_HANDLE cbvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 0, m_cbvSrvDescriptorSize);
-    //m_commandList->SetGraphicsRootDescriptorTable(0, cbvGpuHandle);
-    
-    //CD3DX12_GPU_DESCRIPTOR_HANDLE srvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), m_cbvDescriptorCount, m_cbvSrvDescriptorSize);
-    //m_commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
-    
-    //if (m_boundTexture)
-    //{
-    //    uint32_t offset = m_cbvDescriptorCount + m_srvDescriptorCount + m_boundTexture->index;
-    //    CD3DX12_GPU_DESCRIPTOR_HANDLE srvGpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), offset, m_cbvSrvDescriptorSize);
-    //    m_commandList->SetGraphicsRootDescriptorTable(2, srvGpuHandle);
-    //}
-    
-    //CD3DX12_GPU_DESCRIPTOR_HANDLE samplerHandle(m_samplerHeap->GetGPUDescriptorHandleForHeapStart());
-    //m_commandList->SetGraphicsRootDescriptorTable(3, samplerHandle);
+    uint32_t offset = 0;
+    ComPtr<ID3D12DescriptorHeap> heap = {};
+    for (int i = 0; i < rootSignature.rootParameters.size(); i++)
+    {
+        UINT descriptorSize = 0;
+        switch (rootSignature.rootParameters[i].DescriptorTable.pDescriptorRanges->RangeType)
+        {
+        case D3D12_DESCRIPTOR_RANGE_TYPE_CBV:
+        case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
+        case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
+            heap = m_cbvSrvHeap;
+            descriptorSize = m_cbvSrvDescriptorSize;
+            break;
+        case D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER:
+            offset = 0;
+            heap = m_samplerHeap;
+            descriptorSize = m_samplerDescriptorSize;
+            break;
+        }
+        CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(heap->GetGPUDescriptorHandleForHeapStart(), offset, descriptorSize);
+        m_commandList->SetGraphicsRootDescriptorTable(i, gpuHandle);
+        offset += rootSignature.parameterSizes[i];
+    }
 }

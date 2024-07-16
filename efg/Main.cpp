@@ -120,8 +120,7 @@ int main()
     EfgDescriptorRange rangeSrv = EfgDescriptorRange(efgRange_SRV, 0);
     rangeSrv.insert(lightBuffer);
 
-    EfgDescriptorRange rangeTex = EfgDescriptorRange(efgRange_SRV, 1);
-    rangeTex.insert(texture);
+    EfgDescriptorRange rangeTex = EfgDescriptorRange(efgRange_SRV, 1, 1);
 
     EfgDescriptorRange rangeSampler = EfgDescriptorRange(efgRange_SAMPLER, 0);
     rangeSampler.insert(sampler);
@@ -132,6 +131,7 @@ int main()
     rootParameter1.insert(rangeSrv);
     EfgRootParameter rootParameter2;
     rootParameter2.insert(rangeTex);
+    rootParameter2.data.conditionalBind = true;
 
     EfgRootParameter rootParameter3;
     rootParameter3.insert(rangeSampler);
@@ -159,7 +159,7 @@ int main()
         efg.BindIndexBuffer(indexBuffer);
         efg.Bind2DTexture(texture);
         efg.DrawIndexedInstanced(square.indexCount);
-        //efg.Bind2DTexture(texture2);
+        efg.Bind2DTexture(texture2);
         efg.DrawIndexedInstanced(square.indexCount);
 
         efg.Render();

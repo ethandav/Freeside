@@ -127,11 +127,15 @@ struct EfgProgram
 class EfgDescriptorRange
 {
 public:
-    EfgDescriptorRange(EFG_RANGE_TYPE type, uint32_t baseRegister) : rangeType(type), baseShaderRegister(baseRegister) {};
-    template<typename TYPE> void insert(TYPE& resource) { resource.registerIndex = baseShaderRegister + (uint32_t)resources.size(); resources.push_back(&resource); resourceCount++; };
+    EfgDescriptorRange(EFG_RANGE_TYPE type, uint32_t baseRegister, uint32_t descriptors = 0) : rangeType(type), baseShaderRegister(baseRegister), numDescriptors(descriptors) {};
+    template<typename TYPE> void insert(TYPE& resource) {
+        resource.registerIndex = baseShaderRegister + (uint32_t)resources.size();
+        resources.push_back(&resource);
+        numDescriptors++;
+    };
     D3D12_DESCRIPTOR_RANGE Commit();
 
-    uint32_t resourceCount = 0;
+    uint32_t numDescriptors = 0;
 private:
     EFG_RANGE_TYPE rangeType;
     uint32_t baseShaderRegister = 0;
@@ -141,9 +145,17 @@ private:
 class EfgRootParameter
 {
 public:
-    void insert(EfgDescriptorRange& range) { ranges.push_back(range.Commit()); size += range.resourceCount; };
+    void insert(EfgDescriptorRange& range) { ranges.push_back(range.Commit()); data.size += range.numDescriptors; };
     D3D12_ROOT_PARAMETER Commit();
-    uint32_t size = 0;
+
+    struct Data {
+        uint32_t size = 0;
+        bool conditionalBind = false;
+        std::vector<EfgDescriptorRange*> rangeData;
+    };
+
+    Data data;
+
 private:
     std::vector<D3D12_DESCRIPTOR_RANGE> ranges;
 };
@@ -151,10 +163,10 @@ private:
 class EfgRootSignature
 {
 public:
-    void insert(EfgRootParameter& parameter) { rootParameters.push_back(parameter.Commit()); parameterSizes.push_back(parameter.size); };
+    void insert(EfgRootParameter& parameter) { rootParameters.push_back(parameter.Commit()); parameterData.push_back(parameter.data); };
     ComPtr<ID3DBlob> Serialize();
     ComPtr<ID3D12RootSignature>& Get() { return rootSignature; }
-    std::vector<uint32_t> parameterSizes = {};
+    std::vector<EfgRootParameter::Data> parameterData = {};
     std::vector<D3D12_ROOT_PARAMETER> rootParameters = {};
 private:
     D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};

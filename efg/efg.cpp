@@ -337,6 +337,7 @@ EfgResult EfgContext::CreateConstantBufferView(EfgConstantBuffer* buffer, uint32
     D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
     cbvDesc.BufferLocation = buffer->m_bufferResource->GetGPUVirtualAddress();
     cbvDesc.SizeInBytes = buffer->alignmentSize;
+    buffer->heapOffset = heapOffset;
     buffer->cbvHandle = m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart();
     buffer->cbvHandle.Offset(heapOffset, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
     m_device->CreateConstantBufferView(&cbvDesc, buffer->cbvHandle);
@@ -354,6 +355,7 @@ EfgResult EfgContext::CreateStructuredBufferView(EfgStructuredBuffer* buffer, ui
     srvDesc.Buffer.StructureByteStride = (UINT)buffer->stride;
     srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
     srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+    buffer->heapOffset = heapOffset;
     buffer->srvHandle = m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart();
     buffer->srvHandle.Offset(heapOffset, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
     m_device->CreateShaderResourceView(buffer->m_bufferResource.Get(), &srvDesc, buffer->srvHandle);
@@ -369,6 +371,7 @@ void EfgContext::CreateTextureView(EfgTexture* texture, uint32_t heapOffset)
     srvDesc.Texture2D.MostDetailedMip = 0;
     srvDesc.Texture2D.MipLevels = texture->resource.Get()->GetDesc().MipLevels;
     srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+    texture->heapOffset = heapOffset;
     texture->srvHandle = m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart();
     texture->srvHandle.Offset(heapOffset, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
 
@@ -380,6 +383,7 @@ void EfgContext::CommitSampler(EfgSampler* sampler, uint32_t heapOffset)
     CD3DX12_CPU_DESCRIPTOR_HANDLE samplerHandle(m_samplerHeap->GetCPUDescriptorHandleForHeapStart());
     samplerHandle.Offset(heapOffset, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER));
     m_device->CreateSampler(&sampler->desc, samplerHandle);
+    sampler->heapOffset = heapOffset;
 }
 
 EfgResult EfgContext::CommitShaderResources()
@@ -740,6 +744,8 @@ void EfgContext::BindIndexBuffer(EfgIndexBuffer buffer)
 void EfgContext::Bind2DTexture(const EfgTexture& texture)
 {
     m_boundTexture = &texture;
+    CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), texture.heapOffset, m_cbvSrvDescriptorSize);
+    m_commandList->SetGraphicsRootDescriptorTable(2, gpuHandle);
 }
 
 void EfgContext::CompileProgram(EfgProgram& program)
@@ -791,7 +797,7 @@ D3D12_DESCRIPTOR_RANGE EfgDescriptorRange::Commit()
         descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
         break;
     }
-    descriptorRange.NumDescriptors = static_cast<UINT>(resources.size());
+    descriptorRange.NumDescriptors = numDescriptors;
     descriptorRange.BaseShaderRegister = baseShaderRegister;
     descriptorRange.RegisterSpace = 0;
     descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
@@ -843,6 +849,11 @@ void EfgContext::BindRootDescriptorTable(EfgRootSignature& rootSignature)
     ComPtr<ID3D12DescriptorHeap> heap = {};
     for (int i = 0; i < rootSignature.rootParameters.size(); i++)
     {
+        if (rootSignature.parameterData[i].conditionalBind)
+        {
+            offset += rootSignature.parameterData[i].size;
+            continue;
+        }
         UINT descriptorSize = 0;
         switch (rootSignature.rootParameters[i].DescriptorTable.pDescriptorRanges->RangeType)
         {
@@ -860,6 +871,6 @@ void EfgContext::BindRootDescriptorTable(EfgRootSignature& rootSignature)
         }
         CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(heap->GetGPUDescriptorHandleForHeapStart(), offset, descriptorSize);
         m_commandList->SetGraphicsRootDescriptorTable(i, gpuHandle);
-        offset += rootSignature.parameterSizes[i];
+        offset += rootSignature.parameterData[i].size;
     }
 }

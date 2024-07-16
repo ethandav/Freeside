@@ -4,41 +4,6 @@
 #include <comdef.h>
 #include <iostream>
 
-#define EFG_CHECK_RESULT(fn) \
-    { \
-        EfgResult result = (fn); \
-        if (result != EfgResult_NoError) { \
-            return result; \
-        } \
-    }
-
-#define EFG_INTERNAL_TRY(fn) \
-    do { \
-        try { \
-            (fn); \
-        } \
-        catch (const EfgException& ex) \
-        { \
-            efg->CheckD3DErrors(); \
-            ex.Print(); \
-            return EfgResult_InternalError; \
-        } \
-    } while(0)
-
-#define EFG_INTERNAL_TRY_RET(fn, obj) \
-    do { \
-        try { \
-            obj = (fn); \
-            return obj; \
-        } \
-        catch (const EfgException& ex) \
-        { \
-            efg->CheckD3DErrors(); \
-            ex.Print(); \
-            return obj; \
-        } \
-    } while(0)
-
 #define EFG_D3D_TRY(hr) \
     do { \
         if (FAILED(hr)) { \

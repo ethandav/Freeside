@@ -42,7 +42,8 @@ int main()
     }
 
     EfgWindow efgWindow = efgCreateWindow(1920, 1080, L"New Window");
-    EfgContext efg = efgCreateContext(efgWindow);
+    EfgContext efg;
+    efg.initialize(efgWindow);
     Camera camera = efgCreateCamera(efg, DirectX::XMFLOAT3(0.0f, 0.0f, -5.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f));
 
     Shape square = Shapes::getShape(Shapes::SPHERE);
@@ -81,8 +82,8 @@ int main()
     };
     MaterialBuffer material;
 
-    EfgVertexBuffer vertexBuffer = efgCreateVertexBuffer<Vertex>(efg, square.vertices.data(), square.vertexCount);
-    EfgIndexBuffer indexBuffer = efgCreateIndexBuffer<uint32_t>(efg, square.indices.data(), square.indexCount);
+    EfgVertexBuffer vertexBuffer = efg.CreateVertexBuffer<Vertex>(square.vertices.data(), square.vertexCount);
+    EfgIndexBuffer indexBuffer = efg.CreateIndexBuffer<uint32_t>(square.indices.data(), square.indexCount);
 
     EfgConstantBuffer
         viewProjBuffer,
@@ -91,22 +92,22 @@ int main()
         materialBuffer,
         lightDataBuffer;
 
-    efgCreateConstantBuffer<XMMATRIX>(efg, viewProjBuffer, &camera.viewProj, 1);
-    efgCreateConstantBuffer<XMMATRIX>(efg, transformBuffer, &transformMatrix, 1);
-    efgCreateConstantBuffer<XMFLOAT3>(efg, viewPosBuffer, &camera.eye, 1);
-    efgCreateConstantBuffer<MaterialBuffer>(efg, materialBuffer, &material, 1);
-    efgCreateConstantBuffer<LightBuffer>(efg, lightDataBuffer, &lightData, 1);
+    efg.CreateConstantBuffer<XMMATRIX>(viewProjBuffer, &camera.viewProj, 1);
+    efg.CreateConstantBuffer<XMMATRIX>(transformBuffer, &transformMatrix, 1);
+    efg.CreateConstantBuffer<XMFLOAT3>(viewPosBuffer, &camera.eye, 1);
+    efg.CreateConstantBuffer<MaterialBuffer>(materialBuffer, &material, 1);
+    efg.CreateConstantBuffer<LightBuffer>(lightDataBuffer, &lightData, 1);
 
     EfgStructuredBuffer lightBuffer;
-    efgCreateStructuredBuffer<LightBuffer>(efg, lightBuffer, lights.data(), (uint32_t)lights.size());
+    efg.CreateStructuredBuffer<LightBuffer>(lightBuffer, lights.data(), (uint32_t)lights.size());
 
     EfgTexture texture;
-    efgCreateTexture2D(efg, texture, L"earth.jpeg");
+    efg.CreateTexture2D(texture, L"earth.jpeg");
     EfgTexture texture2;
-    efgCreateTexture2D(efg, texture2, L"water.jpg");
+    efg.CreateTexture2D(texture2, L"water.jpg");
 
     EfgSampler sampler;
-    efgCreateSampler(efg, sampler);
+    efg.CreateSampler(sampler);
 
     EfgDescriptorRange range = EfgDescriptorRange(efgRange_CBV, 0);
     range.insert(viewProjBuffer);
@@ -139,31 +140,30 @@ int main()
     rootSignature.insert(rootParameter1);
     rootSignature.insert(rootParameter2);
     rootSignature.insert(rootParameter3);
-    efgCreateRootSignature(efg, rootSignature);
+    efg.CreateRootSignature(rootSignature);
 
-    EfgProgram program = efgCreateProgram(efg, L"shaders.hlsl");
-    EfgPSO pso = efgCreateGraphicsPipelineState(efg, program, rootSignature);
-    efgSetPipelineState(efg, pso);
+    EfgProgram program = efg.CreateProgram(L"shaders.hlsl");
+    EfgPSO pso = efg.CreateGraphicsPipelineState(program, rootSignature);
+    efg.SetPipelineState(pso);
 
     while (efgWindowIsRunning(efgWindow))
     {
         efgWindowPumpEvents(efgWindow);
-        efgFrame(efg);
+        efg.Frame();
         efgUpdateCamera(efg, efgWindow, camera);
-        efgUpdateConstantBuffer(efg, viewProjBuffer, &camera.viewProj, sizeof(camera.viewProj));
-        efgUpdateConstantBuffer(efg, viewPosBuffer, &camera.eye, sizeof(camera.eye));
-        efgBindVertexBuffer(efg, vertexBuffer);
-        efgBindIndexBuffer(efg, indexBuffer);
-        efgBind2DTexture(efg, texture);
-        efgDrawIndexedInstanced(efg, square.indexCount);
-        efgBind2DTexture(efg, texture2);
-        efgDrawIndexedInstanced(efg, square.indexCount);
+        efg.UpdateConstantBuffer(viewProjBuffer, &camera.viewProj, sizeof(camera.viewProj));
+        efg.UpdateConstantBuffer(viewPosBuffer, &camera.eye, sizeof(camera.eye));
+        efg.BindVertexBuffer(vertexBuffer);
+        efg.BindIndexBuffer(indexBuffer);
+        efg.Bind2DTexture(texture);
+        efg.DrawIndexedInstanced(square.indexCount);
+        efg.Bind2DTexture(texture2);
+        efg.DrawIndexedInstanced(square.indexCount);
 
-        efgRender(efg);
+        efg.Render();
     }
 
     efgDestroyWindow(efgWindow);
-    efgDestroyContext(efg);
 
     return 0;
 }

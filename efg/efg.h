@@ -124,14 +124,6 @@ struct EfgProgram
     ComPtr<ID3DBlob> ps;
 };
 
-class EfgContext
-{
-public:
-	friend class EfgInternal;
-private:
-	uint64_t handle;
-};
-
 class EfgDescriptorRange
 {
 public:
@@ -166,12 +158,10 @@ private:
 
 };
 
-class EfgInternal
+class EfgContext
 {
 public:
-	EfgInternal(EfgContext& efg) { efg.handle = reinterpret_cast<uint64_t>(this); };
 	void initialize(HWND window);
-	static inline EfgInternal* GetEfg(EfgContext& context);
     EfgVertexBuffer CreateVertexBuffer(void const* data, UINT size);
     EfgIndexBuffer CreateIndexBuffer(void const* data, UINT size);
     void CreateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size);
@@ -179,7 +169,7 @@ public:
     void CreateTexture2D(EfgTexture& texture, const wchar_t* filename);
     void CreateSampler(EfgSampler & sampler);
     void CreateRootSignature(EfgRootSignature& rootSignature);
-    void updateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size);
+    void UpdateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size);
     void BindVertexBuffer(EfgVertexBuffer buffer);
     void BindIndexBuffer(EfgIndexBuffer buffer);
     void Bind2DTexture(const EfgTexture& texture);
@@ -193,6 +183,33 @@ public:
     void Render();
     void Destroy();
     void CheckD3DErrors();
+
+    template<typename TYPE>
+    EfgVertexBuffer CreateVertexBuffer(void const* data, uint32_t count)
+    {
+        EfgVertexBuffer buffer = CreateVertexBuffer(data, count * sizeof(TYPE));
+        return buffer;
+    }
+    
+    template<typename TYPE>
+    EfgIndexBuffer CreateIndexBuffer(void const* data, uint32_t count)
+    {
+        EfgIndexBuffer buffer = CreateIndexBuffer(data, count * sizeof(TYPE));
+        return buffer;
+    }
+    
+    template<typename TYPE>
+    void CreateConstantBuffer(EfgConstantBuffer& buffer, void const* data, uint32_t count)
+    {
+        CreateConstantBuffer(buffer, data, count * sizeof(TYPE));
+    }
+    
+    template<typename TYPE>
+    void CreateStructuredBuffer(EfgStructuredBuffer& buffer, void const* data, uint32_t count)
+    {
+        size_t stride = sizeof(TYPE);
+        CreateStructuredBuffer(buffer, data, count * sizeof(TYPE), count, stride);
+    }
 
 private:
     void GetHardwareAdapter(
@@ -269,52 +286,5 @@ private:
     UINT64 m_fenceValue = 0;
 };
 
-EfgContext efgCreateContext(HWND window);
-EfgResult efgDestroyContext(EfgContext context);
-EfgResult efgBindVertexBuffer(EfgContext context, EfgVertexBuffer buffer);
-EfgResult efgBindIndexBuffer(EfgContext context, EfgIndexBuffer buffer);
-EfgResult efgBind2DTexture(EfgContext context, const EfgTexture& texture);
-EfgVertexBuffer efgCreateVertexBuffer(EfgContext context, void const* data, UINT size);
-EfgIndexBuffer efgCreateIndexBuffer(EfgContext context, void const* data, UINT size);
-EfgResult efgCreateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size);
-EfgResult efgCreateStructuredBuffer(EfgContext context, EfgStructuredBuffer& buffer, void const* data, UINT size, uint32_t count, size_t stride);
-EfgResult efgCreateTexture2D(EfgContext context, EfgTexture& texture, const wchar_t* filename);
-EfgResult efgCreateSampler(EfgContext context, EfgSampler& sampler);
-EfgResult efgCreateRootSignature(EfgContext context, EfgRootSignature& rootSignature);
-EfgResult efgUpdateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size);
-EfgResult efgCommitShaderResources(EfgContext context);
-EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName);
-EfgPSO efgCreateGraphicsPipelineState(EfgContext context, EfgProgram program, EfgRootSignature& rootSignature);
-EfgResult efgSetPipelineState(EfgContext efg, EfgPSO pso);
-EfgResult efgDrawInstanced(EfgContext efg, uint32_t vertexCount);
-EfgResult efgDrawIndexedInstanced(EfgContext efg, uint32_t indexCount);
-EfgResult efgRender(EfgContext efg);
-EfgResult efgFrame(EfgContext context);
 XMMATRIX efgCreateTransformMatrix(XMFLOAT3 translation, XMFLOAT3 rotation, XMFLOAT3 scale);
 
-template<typename TYPE>
-EfgVertexBuffer efgCreateVertexBuffer(EfgContext context, void const* data, uint32_t count)
-{
-    EfgVertexBuffer buffer = efgCreateVertexBuffer(context, data, count * sizeof(TYPE));
-    return buffer;
-}
-
-template<typename TYPE>
-EfgIndexBuffer efgCreateIndexBuffer(EfgContext context, void const* data, uint32_t count)
-{
-    EfgIndexBuffer buffer = efgCreateIndexBuffer(context, data, count * sizeof(TYPE));
-    return buffer;
-}
-
-template<typename TYPE>
-void efgCreateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, uint32_t count)
-{
-    efgCreateConstantBuffer(context, buffer, data, count * sizeof(TYPE));
-}
-
-template<typename TYPE>
-void efgCreateStructuredBuffer(EfgContext context, EfgStructuredBuffer& buffer, void const* data, uint32_t count)
-{
-    size_t stride = sizeof(TYPE);
-    efgCreateStructuredBuffer(context, buffer, data, count * sizeof(TYPE), count, stride);
-}

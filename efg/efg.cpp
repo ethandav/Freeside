@@ -2,241 +2,6 @@
 #include "efg_exception.h"
 #include <iostream>
 
-EfgContext efgCreateContext(HWND window)
-{
-	EfgContext context = {};
-	EfgInternal* efg = new EfgInternal(context);
-	efg->initialize(window);
-	return context;
-}
-
-EfgResult efgDestroyContext(EfgContext context)
-{
-	EfgInternal* efg = EfgInternal::GetEfg(context);
-    if (!efg)
-    {
-        EFG_SHOW_ERROR("Cannot destroy: Invalid context");
-        return EfgResult_InvalidContext;
-    }
-	delete efg;
-    return EfgResult_NoError;
-}
-
-EfgResult efgRender(EfgContext context)
-{
-	EfgInternal* efg = EfgInternal::GetEfg(context);
-    if (!efg)
-    {
-        EFG_SHOW_ERROR("Cannot Render: Invalid context");
-        return EfgResult_InvalidContext;
-    }
-    efg->Render();
-    return EfgResult_NoError;
-}
-
-EfgResult efgCommitShaderResources(EfgContext context)
-{
-	EfgInternal* efg = EfgInternal::GetEfg(context);
-    if (!efg)
-    {
-        EFG_SHOW_ERROR("Cannot commit shader resources: Invalid Context");
-        return EfgResult_InvalidContext;
-    }
-    EFG_INTERNAL_TRY(efg->CommitShaderResources());
-    return EfgResult_NoError;
-}
-
-EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName)
-{
-    EfgInternal* efg = EfgInternal::GetEfg(context);
-    return efg->CreateProgram(fileName);
-}
-
-EfgPSO efgCreateGraphicsPipelineState(EfgContext context, EfgProgram program, EfgRootSignature& rootSignature)
-{
-    EfgPSO pso = {};
-    EfgInternal* efg = EfgInternal::GetEfg(context);
-    if (!efg)
-    {
-        EFG_SHOW_ERROR("Cannot commit shader resources: Invalid Context");
-        return pso;
-    }
-    EFG_INTERNAL_TRY_RET(efg->CreateGraphicsPipelineState(program, rootSignature), pso);
-}
-
-EfgResult efgSetPipelineState(EfgContext context, EfgPSO pso)
-{
-    EfgInternal* efg = EfgInternal::GetEfg(context);
-    if (!efg)
-    {
-        EFG_SHOW_ERROR("Cannot Set Pipeline State: Invalid context");
-        return EfgResult_InvalidContext;
-    }
-    efg->SetPipelineState(pso);
-    return EfgResult_NoError;
-}
-
-EfgVertexBuffer efgCreateVertexBuffer(EfgContext context, void const* data, UINT size)
-{
-    EfgVertexBuffer buffer = {};
-    EfgInternal* efg = EfgInternal::GetEfg(context);
-    if (!efg)
-    {
-        EFG_SHOW_ERROR("Cannot create vertex buffer: Invalid context");
-        return buffer;
-    }
-    EFG_INTERNAL_TRY_RET(efg->CreateVertexBuffer(data, size), buffer);
-}
-
-EfgIndexBuffer efgCreateIndexBuffer(EfgContext context, void const* data, UINT size)
-{
-    EfgIndexBuffer buffer = {};
-    EfgInternal* efg = EfgInternal::GetEfg(context);
-    if (!efg)
-    {
-        EFG_SHOW_ERROR("Cannot create index buffer: Invalid context");
-        return buffer;
-    }
-    EFG_INTERNAL_TRY_RET(efg->CreateIndexBuffer(data, size), buffer);
-}
-
-EfgResult efgCreateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size)
-{
-    EfgInternal* efg = EfgInternal::GetEfg(context);
-    if (!efg)
-    {
-        EFG_SHOW_ERROR("Cannot create Constant Buffer: Invalid context");
-        return EfgResult_InvalidContext;
-    }
-    EFG_INTERNAL_TRY(efg->CreateConstantBuffer(buffer, data, size));
-    return EfgResult_NoError;
-}
-
-EfgResult efgCreateStructuredBuffer(EfgContext context, EfgStructuredBuffer& buffer, void const* data, UINT size, uint32_t count, size_t stride)
-{
-    EfgInternal* efg = EfgInternal::GetEfg(context);
-    if (!efg)
-    {
-        EFG_SHOW_ERROR("Cannot create Structured Buffer: Invalid context");
-        return EfgResult_InvalidContext;
-    }
-    EFG_INTERNAL_TRY(efg->CreateStructuredBuffer(buffer, data, size, count, stride));
-    return EfgResult_NoError;
-}
-
-EfgResult efgCreateTexture2D(EfgContext context, EfgTexture& texture, const wchar_t* filename)
-{
-    EfgInternal* efg = EfgInternal::GetEfg(context);
-    if (!efg)
-    {
-        EFG_SHOW_ERROR("Cannot create Structured Buffer: Invalid context");
-        return EfgResult_InvalidContext;
-    }
-    EFG_INTERNAL_TRY(efg->CreateTexture2D(texture, filename));
-}
-
-EfgResult efgCreateSampler(EfgContext context, EfgSampler& sampler)
-{
-    EfgInternal* efg = EfgInternal::GetEfg(context);
-    if (!efg)
-    {
-        EFG_SHOW_ERROR("Cannot create Sampler: Invalid context");
-        return EfgResult_InvalidContext;
-    }
-    EFG_INTERNAL_TRY(efg->CreateSampler(sampler));
-}
-
-EfgResult efgUpdateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size)
-{
-    EfgInternal* efg = EfgInternal::GetEfg(context);
-    if (!efg)
-    {
-        EFG_SHOW_ERROR("Cannot update Constant Buffer: Invalid context");
-        return EfgResult_InvalidContext;
-    }
-    efg->updateConstantBuffer(buffer, data, size);
-    return EfgResult_NoError;
-}
-
-EfgResult efgBindVertexBuffer(EfgContext context, EfgVertexBuffer buffer)
-{
-    EfgInternal* efg = EfgInternal::GetEfg(context);
-    if (!efg)
-    {
-        EFG_SHOW_ERROR("Cannot bind Vertex Buffer: Invalid context");
-        return EfgResult_InvalidContext;
-    }
-    EFG_INTERNAL_TRY(efg->BindVertexBuffer(buffer));
-    return EfgResult_NoError;
-}
-
-EfgResult efgBindIndexBuffer(EfgContext context, EfgIndexBuffer buffer)
-{
-    EfgInternal* efg = EfgInternal::GetEfg(context);
-    if (!efg)
-    {
-        EFG_SHOW_ERROR("Cannot bind Index Buffer: Invalid context");
-        return EfgResult_InvalidContext;
-    }
-    EFG_INTERNAL_TRY(efg->BindIndexBuffer(buffer));
-    return EfgResult_NoError;
-}
-
-EfgResult efgBind2DTexture(EfgContext context, const EfgTexture& texture)
-{
-    EfgInternal* efg = EfgInternal::GetEfg(context);
-    if (!efg)
-    {
-        EFG_SHOW_ERROR("Cannot bind 2D Texture: Invalid context");
-        return EfgResult_InvalidContext;
-    }
-    EFG_INTERNAL_TRY(efg->Bind2DTexture(texture));
-    return EfgResult_NoError;
-}
-
-EfgResult efgDrawInstanced(EfgContext context, uint32_t vertexCount)
-{
-    EfgInternal* efg = EfgInternal::GetEfg(context);
-    if (!efg)
-    {
-        EFG_SHOW_ERROR("Cannot bind Index Buffer: Invalid context");
-        return EfgResult_InvalidContext;
-    }
-    EFG_INTERNAL_TRY(efg->DrawInstanced(vertexCount));
-    return EfgResult_NoError;
-}
-
-EfgResult efgDrawIndexedInstanced(EfgContext context, uint32_t indexCount)
-{
-    EfgInternal* efg = EfgInternal::GetEfg(context);
-    if (!efg)
-    {
-        EFG_SHOW_ERROR("Cannot bind Index Buffer: Invalid context");
-        return EfgResult_InvalidContext;
-    }
-    EFG_INTERNAL_TRY(efg->DrawIndexedInstanced(indexCount));
-    return EfgResult_NoError;
-}
-
-EfgResult efgFrame(EfgContext context)
-{
-    EfgInternal* efg = EfgInternal::GetEfg(context);
-    if (!efg)
-    {
-        EFG_SHOW_ERROR("Cannot begin frame: Invalid context");
-        return EfgResult_InvalidContext;
-    }
-    EFG_INTERNAL_TRY(efg->Frame());
-    return EfgResult_NoError;
-}
-
-EfgResult efgCreateRootSignature(EfgContext context, EfgRootSignature& rootSignature)
-{
-    EfgInternal* efg = EfgInternal::GetEfg(context);
-    EFG_INTERNAL_TRY(efg->CreateRootSignature(rootSignature));
-    return EfgResult_NoError;
-}
-
 XMMATRIX efgCreateTransformMatrix(XMFLOAT3 translation, XMFLOAT3 rotation, XMFLOAT3 scale)
 {
     XMVECTOR rotationRadians = XMVectorSet(XMConvertToRadians(rotation.x), XMConvertToRadians(rotation.y), XMConvertToRadians(rotation.z), 0.0f);
@@ -248,7 +13,7 @@ XMMATRIX efgCreateTransformMatrix(XMFLOAT3 translation, XMFLOAT3 rotation, XMFLO
     return modelMatrix;
 }
 
-void EfgInternal::initialize(HWND window)
+void EfgContext::initialize(HWND window)
 {
 	window_ = window;
     RECT window_rect = {};
@@ -269,18 +34,13 @@ void EfgInternal::initialize(HWND window)
     LoadAssets();
 }
 
-EfgInternal* EfgInternal::GetEfg(EfgContext& context)
-{
-	return reinterpret_cast<EfgInternal*>(context.handle);
-}
-
-std::wstring EfgInternal::GetAssetFullPath(LPCWSTR assetName)
+std::wstring EfgContext::GetAssetFullPath(LPCWSTR assetName)
 {
     return m_assetsPath + assetName;
 }
 
 _Use_decl_annotations_
-void EfgInternal::GetHardwareAdapter(
+void EfgContext::GetHardwareAdapter(
     IDXGIFactory1* pFactory,
     IDXGIAdapter1** ppAdapter,
     bool requestHighPerformanceAdapter)
@@ -345,7 +105,7 @@ void EfgInternal::GetHardwareAdapter(
     *ppAdapter = adapter.Detach();
 }
 
-void EfgInternal::LoadPipeline()
+void EfgContext::LoadPipeline()
 {
     UINT dxgiFactoryFlags = 0;
 
@@ -442,7 +202,7 @@ void EfgInternal::LoadPipeline()
     EFG_D3D_TRY(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
 }
 
-ComPtr<ID3D12DescriptorHeap> EfgInternal::CreateDescriptorHeap(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type)
+ComPtr<ID3D12DescriptorHeap> EfgContext::CreateDescriptorHeap(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type)
 {
     ComPtr<ID3D12DescriptorHeap> heap = {};
     D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
@@ -454,7 +214,7 @@ ComPtr<ID3D12DescriptorHeap> EfgInternal::CreateDescriptorHeap(uint32_t numDescr
     return heap;
 }
 
-EfgResult EfgInternal::CreateRootSignature(uint32_t numCbv, uint32_t numSrv, uint32_t numSampler, uint32_t numTextures)
+EfgResult EfgContext::CreateRootSignature(uint32_t numCbv, uint32_t numSrv, uint32_t numSampler, uint32_t numTextures)
 {
     std::vector<D3D12_ROOT_PARAMETER> rootParameters;
     std::vector<D3D12_DESCRIPTOR_RANGE> descriptorRanges;
@@ -559,7 +319,7 @@ EfgResult EfgInternal::CreateRootSignature(uint32_t numCbv, uint32_t numSrv, uin
     return EfgResult_NoError;
 }
 
-void EfgInternal::LoadAssets()
+void EfgContext::LoadAssets()
 {
     // Create the command list.
     EFG_D3D_TRY(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator.Get(), nullptr, IID_PPV_ARGS(&m_commandList)));
@@ -587,7 +347,7 @@ void EfgInternal::LoadAssets()
     }
 }
 
-void EfgInternal::Frame()
+void EfgContext::Frame()
 {
     // Command list allocators can only be reset when the associated 
     // command lists have finished execution on the GPU; apps should use 
@@ -619,7 +379,7 @@ void EfgInternal::Frame()
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
-void EfgInternal::Render()
+void EfgContext::Render()
 {
     // Indicate that the back buffer will now be used to present.
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
@@ -632,7 +392,7 @@ void EfgInternal::Render()
     WaitForPreviousFrame();
 }
 
-void EfgInternal::ExecuteCommandList()
+void EfgContext::ExecuteCommandList()
 {
     // Execute the command list.
     EFG_D3D_TRY(m_commandList->Close());
@@ -640,7 +400,7 @@ void EfgInternal::ExecuteCommandList()
     m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 }
 
-EfgResult EfgInternal::CreateCbvSrvDescriptorHeap(uint32_t numDescriptors)
+EfgResult EfgContext::CreateCbvSrvDescriptorHeap(uint32_t numDescriptors)
 {
     if (numDescriptors > 0)
     {
@@ -655,7 +415,7 @@ EfgResult EfgInternal::CreateCbvSrvDescriptorHeap(uint32_t numDescriptors)
     return EfgResult_NoError;
 }
 
-void EfgInternal::CreateSamplerDescriptorHeap(uint32_t samplerCount)
+void EfgContext::CreateSamplerDescriptorHeap(uint32_t samplerCount)
 {
     if (samplerCount > 0)
     {
@@ -667,7 +427,7 @@ void EfgInternal::CreateSamplerDescriptorHeap(uint32_t samplerCount)
     }
 }
 
-EfgResult EfgInternal::CreateConstantBufferView(EfgConstantBuffer* buffer, uint32_t heapOffset)
+EfgResult EfgContext::CreateConstantBufferView(EfgConstantBuffer* buffer, uint32_t heapOffset)
 {
     if (!m_cbvSrvHeap)
     {
@@ -683,7 +443,7 @@ EfgResult EfgInternal::CreateConstantBufferView(EfgConstantBuffer* buffer, uint3
     return EfgResult_NoError;
 }
 
-EfgResult EfgInternal::CreateStructuredBufferView(EfgStructuredBuffer* buffer, uint32_t heapOffset)
+EfgResult EfgContext::CreateStructuredBufferView(EfgStructuredBuffer* buffer, uint32_t heapOffset)
 {
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
@@ -700,7 +460,7 @@ EfgResult EfgInternal::CreateStructuredBufferView(EfgStructuredBuffer* buffer, u
     return EfgResult_NoError;
 }
 
-void EfgInternal::CreateTextureView(EfgTexture* texture, uint32_t heapOffset)
+void EfgContext::CreateTextureView(EfgTexture* texture, uint32_t heapOffset)
 {
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -715,14 +475,14 @@ void EfgInternal::CreateTextureView(EfgTexture* texture, uint32_t heapOffset)
     m_device->CreateShaderResourceView(texture->resource.Get(), &srvDesc, texture->srvHandle);
 }
 
-void EfgInternal::CommitSampler(EfgSampler* sampler, uint32_t heapOffset)
+void EfgContext::CommitSampler(EfgSampler* sampler, uint32_t heapOffset)
 {
     CD3DX12_CPU_DESCRIPTOR_HANDLE samplerHandle(m_samplerHeap->GetCPUDescriptorHandleForHeapStart());
     samplerHandle.Offset(heapOffset, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
     m_device->CreateSampler(&sampler->desc, samplerHandle);
 }
 
-EfgResult EfgInternal::CommitShaderResources()
+EfgResult EfgContext::CommitShaderResources()
 {
     CreateCbvSrvDescriptorHeap(m_cbvDescriptorCount + m_srvDescriptorCount + m_textureCount);
     CreateSamplerDescriptorHeap(m_samplerCount);
@@ -751,7 +511,7 @@ EfgResult EfgInternal::CommitShaderResources()
     return EfgResult_NoError;
 }
 
-void EfgInternal::bindDescriptorHeaps()
+void EfgContext::bindDescriptorHeaps()
 {
     if (m_cbvSrvHeap)
     {
@@ -776,7 +536,7 @@ void EfgInternal::bindDescriptorHeaps()
     }
 }
 
-void EfgInternal::DrawInstanced(uint32_t vertexCount)
+void EfgContext::DrawInstanced(uint32_t vertexCount)
 {
     // Command list allocators can only be reset when the associated 
     // command lists have finished execution on the GPU; apps should use 
@@ -812,7 +572,7 @@ void EfgInternal::DrawInstanced(uint32_t vertexCount)
     m_boundVertexBuffer = {};
 }
 
-void EfgInternal::DrawIndexedInstanced(uint32_t indexCount)
+void EfgContext::DrawIndexedInstanced(uint32_t indexCount)
 {
     bindDescriptorHeaps();
     m_commandList->IASetVertexBuffers(0, 1, &m_boundVertexBuffer.view);
@@ -820,7 +580,7 @@ void EfgInternal::DrawIndexedInstanced(uint32_t indexCount)
     m_commandList->DrawIndexedInstanced(indexCount, 1, 0, 0, 0);
 }
 
-void EfgInternal::Destroy()
+void EfgContext::Destroy()
 {
     // Ensure that the GPU is no longer referencing resources that are about to be
     // cleaned up by the destructor.
@@ -829,7 +589,7 @@ void EfgInternal::Destroy()
     CloseHandle(m_fenceEvent);
 }
 
-void EfgInternal::WaitForPreviousFrame()
+void EfgContext::WaitForPreviousFrame()
 {
     // WAITING FOR THE FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
     // This is code implemented as such for simplicity. The D3D12HelloFrameBuffering
@@ -851,7 +611,7 @@ void EfgInternal::WaitForPreviousFrame()
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 }
 
-ComPtr<ID3D12Resource> EfgInternal::CreateBufferResource(EFG_CPU_ACCESS cpuAccess, UINT size)
+ComPtr<ID3D12Resource> EfgContext::CreateBufferResource(EFG_CPU_ACCESS cpuAccess, UINT size)
 {
     ComPtr<ID3D12Resource> resource = {};
     D3D12_HEAP_TYPE heapType = D3D12_HEAP_TYPE_DEFAULT;
@@ -893,7 +653,7 @@ ComPtr<ID3D12Resource> EfgInternal::CreateBufferResource(EFG_CPU_ACCESS cpuAcces
     return resource;
 }
 
-void EfgInternal::CreateBuffer(void const* data, EfgBuffer& buffer, EFG_CPU_ACCESS cpuAccess, D3D12_RESOURCE_STATES finalState)
+void EfgContext::CreateBuffer(void const* data, EfgBuffer& buffer, EFG_CPU_ACCESS cpuAccess, D3D12_RESOURCE_STATES finalState)
 {
     ComPtr<ID3D12Resource> uploadBuffer = CreateBufferResource(EFG_CPU_WRITE, buffer.alignmentSize);
     
@@ -926,7 +686,7 @@ void EfgInternal::CreateBuffer(void const* data, EfgBuffer& buffer, EFG_CPU_ACCE
     }
 }
 
-void EfgInternal::TransitionResourceState(ComPtr<ID3D12Resource>& resource, D3D12_RESOURCE_STATES currentState, D3D12_RESOURCE_STATES finalState)
+void EfgContext::TransitionResourceState(ComPtr<ID3D12Resource>& resource, D3D12_RESOURCE_STATES currentState, D3D12_RESOURCE_STATES finalState)
 {
     if (currentState != finalState)
     {
@@ -942,7 +702,7 @@ void EfgInternal::TransitionResourceState(ComPtr<ID3D12Resource>& resource, D3D1
     }
 }
 
-void EfgInternal::CopyBuffer(ComPtr<ID3D12Resource> dest, ComPtr<ID3D12Resource> src, UINT size, D3D12_RESOURCE_STATES currentState, D3D12_RESOURCE_STATES finalState)
+void EfgContext::CopyBuffer(ComPtr<ID3D12Resource> dest, ComPtr<ID3D12Resource> src, UINT size, D3D12_RESOURCE_STATES currentState, D3D12_RESOURCE_STATES finalState)
 {
     ResetCommandList();
     
@@ -954,7 +714,7 @@ void EfgInternal::CopyBuffer(ComPtr<ID3D12Resource> dest, ComPtr<ID3D12Resource>
     WaitForGpu();
 }
 
-EfgVertexBuffer EfgInternal::CreateVertexBuffer(void const* data, UINT size)
+EfgVertexBuffer EfgContext::CreateVertexBuffer(void const* data, UINT size)
 {
     EfgVertexBuffer buffer = { };
 
@@ -970,7 +730,7 @@ EfgVertexBuffer EfgInternal::CreateVertexBuffer(void const* data, UINT size)
     return buffer;
 }
 
-EfgIndexBuffer EfgInternal::CreateIndexBuffer(void const* data, UINT size)
+EfgIndexBuffer EfgContext::CreateIndexBuffer(void const* data, UINT size)
 {
     EfgIndexBuffer buffer = { };
 
@@ -986,7 +746,7 @@ EfgIndexBuffer EfgInternal::CreateIndexBuffer(void const* data, UINT size)
     return buffer;
 }
 
-void EfgInternal::CreateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size)
+void EfgContext::CreateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size)
 {
     buffer.size = size;
     buffer.alignmentSize = (size + 255) & ~255;
@@ -998,7 +758,7 @@ void EfgInternal::CreateConstantBuffer(EfgConstantBuffer& buffer, void const* da
     m_cbvDescriptorCount++;
 }
 
-void EfgInternal::CreateStructuredBuffer(EfgStructuredBuffer& buffer, void const* data, UINT size, uint32_t count, size_t stride)
+void EfgContext::CreateStructuredBuffer(EfgStructuredBuffer& buffer, void const* data, UINT size, uint32_t count, size_t stride)
 {
     buffer.size = size;
     buffer.alignmentSize = size;
@@ -1012,7 +772,7 @@ void EfgInternal::CreateStructuredBuffer(EfgStructuredBuffer& buffer, void const
     m_srvDescriptorCount++;
 }
 
-void EfgInternal::CreateTexture2D(EfgTexture& texture, const wchar_t* filename)
+void EfgContext::CreateTexture2D(EfgTexture& texture, const wchar_t* filename)
 {
     ResourceUploadBatch resourceUpload(m_device.Get());
     resourceUpload.Begin();
@@ -1024,7 +784,7 @@ void EfgInternal::CreateTexture2D(EfgTexture& texture, const wchar_t* filename)
     m_textureCount++;
 }
 
-void EfgInternal::CreateSampler(EfgSampler& sampler)
+void EfgContext::CreateSampler(EfgSampler& sampler)
 {
     sampler.desc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
     sampler.desc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
@@ -1046,7 +806,7 @@ void EfgInternal::CreateSampler(EfgSampler& sampler)
 
 }
 
-void EfgInternal::updateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size)
+void EfgContext::UpdateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size)
 {
     void* mappedData = nullptr;
     D3D12_RANGE readRange = { 0, 0 };
@@ -1057,7 +817,7 @@ void EfgInternal::updateConstantBuffer(EfgConstantBuffer& buffer, void const* da
     buffer.m_bufferResource->Unmap(0, &writeRange);
 }
 
-void EfgInternal::WaitForGpu()
+void EfgContext::WaitForGpu()
 {
     m_fenceValue++;
     m_commandQueue->Signal(m_fence.Get(), m_fenceValue);
@@ -1072,13 +832,13 @@ void EfgInternal::WaitForGpu()
     }
 }
 
-void EfgInternal::ResetCommandList()
+void EfgContext::ResetCommandList()
 {
     EFG_D3D_TRY(m_commandAllocator->Reset());
     EFG_D3D_TRY(m_commandList->Reset(m_commandAllocator.Get(), nullptr));
 }
 
-EfgProgram EfgInternal::CreateProgram(LPCWSTR fileName)
+EfgProgram EfgContext::CreateProgram(LPCWSTR fileName)
 {
     EfgProgram program = {};
     program.source = GetAssetFullPath(fileName);
@@ -1086,7 +846,7 @@ EfgProgram EfgInternal::CreateProgram(LPCWSTR fileName)
     return program;
 }
 
-EfgPSO EfgInternal::CreateGraphicsPipelineState(EfgProgram program, EfgRootSignature& rootSignature)
+EfgPSO EfgContext::CreateGraphicsPipelineState(EfgProgram program, EfgRootSignature& rootSignature)
 {
     EfgPSO pso = {};
     D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
@@ -1118,27 +878,27 @@ EfgPSO EfgInternal::CreateGraphicsPipelineState(EfgProgram program, EfgRootSigna
     return pso;
 }
 
-void EfgInternal::SetPipelineState(EfgPSO pso)
+void EfgContext::SetPipelineState(EfgPSO pso)
 {
     m_boundPSO = pso;
 }
 
-void EfgInternal::BindVertexBuffer(EfgVertexBuffer buffer)
+void EfgContext::BindVertexBuffer(EfgVertexBuffer buffer)
 {
     m_boundVertexBuffer = buffer;
 }
 
-void EfgInternal::BindIndexBuffer(EfgIndexBuffer buffer)
+void EfgContext::BindIndexBuffer(EfgIndexBuffer buffer)
 {
     m_boundIndexBuffer = buffer;
 }
 
-void EfgInternal::Bind2DTexture(const EfgTexture& texture)
+void EfgContext::Bind2DTexture(const EfgTexture& texture)
 {
     m_boundTexture = &texture;
 }
 
-void EfgInternal::CompileProgram(EfgProgram& program)
+void EfgContext::CompileProgram(EfgProgram& program)
 {
 #if defined(_DEBUG)
     UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
@@ -1150,7 +910,7 @@ void EfgInternal::CompileProgram(EfgProgram& program)
     EFG_D3D_TRY(D3DCompileFromFile(program.source.c_str(), nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &program.ps, nullptr));
 }
 
-void EfgInternal::CheckD3DErrors()
+void EfgContext::CheckD3DErrors()
 {
     ComPtr<ID3D12InfoQueue> infoQueue;
     if (SUCCEEDED(m_device.As(&infoQueue)))
@@ -1227,7 +987,7 @@ ComPtr<ID3DBlob> EfgRootSignature::Serialize()
     return serializedRootSignature;
 }
 
-void EfgInternal::CreateRootSignature(EfgRootSignature& rootSignature)
+void EfgContext::CreateRootSignature(EfgRootSignature& rootSignature)
 {
     ComPtr<ID3DBlob> serializedRootSignature = rootSignature.Serialize();
     ThrowIfFailed(m_device->CreateRootSignature(0, serializedRootSignature->GetBufferPointer(), serializedRootSignature->GetBufferSize(), IID_PPV_ARGS(&rootSignature.Get())));

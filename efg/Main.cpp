@@ -108,9 +108,41 @@ int main()
     EfgSampler sampler;
     efgCreateSampler(efg, sampler);
 
-    efgCommitShaderResources(efg);
+    EfgDescriptorRange range = EfgDescriptorRange(efgRange_CBV, 0);
+    range.insert(viewProjBuffer);
+    range.insert(transformBuffer);
+    range.insert(viewPosBuffer);
+    range.insert(materialBuffer);
+    range.insert(lightDataBuffer);
+
+    EfgDescriptorRange rangeSrv = EfgDescriptorRange(efgRange_SRV, 0);
+    rangeSrv.insert(lightBuffer);
+
+    EfgDescriptorRange rangeTex = EfgDescriptorRange(efgRange_SRV, 1);
+    rangeTex.insert(texture);
+
+    EfgDescriptorRange rangeSampler = EfgDescriptorRange(efgRange_SAMPLER, 0);
+    rangeSampler.insert(sampler);
+
+    EfgRootParameter rootParameter0;
+    rootParameter0.insert(range);
+    EfgRootParameter rootParameter1;
+    rootParameter1.insert(rangeSrv);
+    EfgRootParameter rootParameter2;
+    rootParameter2.insert(rangeTex);
+
+    EfgRootParameter rootParameter3;
+    rootParameter3.insert(rangeSampler);
+
+    EfgRootSignature rootSignature;
+    rootSignature.insert(rootParameter0);
+    rootSignature.insert(rootParameter1);
+    rootSignature.insert(rootParameter2);
+    rootSignature.insert(rootParameter3);
+    efgCreateRootSignature(efg, rootSignature);
+
     EfgProgram program = efgCreateProgram(efg, L"shaders.hlsl");
-    EfgPSO pso = efgCreateGraphicsPipelineState(efg, program);
+    EfgPSO pso = efgCreateGraphicsPipelineState(efg, program, rootSignature);
     efgSetPipelineState(efg, pso);
 
     while (efgWindowIsRunning(efgWindow))

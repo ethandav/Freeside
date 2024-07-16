@@ -52,7 +52,20 @@ enum EfgResult
     EfgResult_InternalError
 };
 
-struct EfgBuffer
+enum EFG_RANGE_TYPE
+{
+    efgRange_CBV,
+    efgRange_SRV,
+    efgRange_SAMPLER
+};
+
+struct EfgResource
+{
+    uint32_t heapOffset = 0;
+    uint32_t registerIndex = 0;
+};
+
+struct EfgBuffer : public EfgResource
 {
     EFG_BUFFER_TYPE type = {};
     UINT size = 0;
@@ -84,7 +97,7 @@ struct EfgStructuredBuffer: public EfgBuffer
     CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle = {};
 };
 
-struct EfgTexture
+struct EfgTexture : EfgResource
 {
     uint32_t index = 0;
     ComPtr<ID3D12Resource> resource;
@@ -92,7 +105,7 @@ struct EfgTexture
     CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle = {};
 };
 
-struct EfgSampler
+struct EfgSampler : EfgResource
 {
     D3D12_SAMPLER_DESC desc = {};
 };
@@ -119,6 +132,40 @@ private:
 	uint64_t handle;
 };
 
+class EfgDescriptorRange
+{
+public:
+    EfgDescriptorRange(EFG_RANGE_TYPE type, uint32_t baseRegister) : rangeType(type), baseShaderRegister(baseRegister) {};
+    template<typename TYPE> void insert(TYPE& resource) { resource.registerIndex = baseShaderRegister + (uint32_t)resources.size(); resources.push_back(&resource); };
+    D3D12_DESCRIPTOR_RANGE Commit();
+private:
+    EFG_RANGE_TYPE rangeType;
+    uint32_t baseShaderRegister = 0;
+    std::vector<EfgResource*> resources = {};
+};
+
+class EfgRootParameter
+{
+public:
+    void insert(EfgDescriptorRange& range) { ranges.push_back(range.Commit()); };
+    D3D12_ROOT_PARAMETER Commit();
+private:
+    std::vector<D3D12_DESCRIPTOR_RANGE> ranges;
+};
+
+class EfgRootSignature
+{
+public:
+    void insert(EfgRootParameter& parameter) { rootParameters.push_back(parameter.Commit()); };
+    ComPtr<ID3DBlob> Serialize();
+    ComPtr<ID3D12RootSignature>& Get() { return rootSignature; }
+private:
+    std::vector<D3D12_ROOT_PARAMETER> rootParameters = {};
+    D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
+    ComPtr<ID3D12RootSignature> rootSignature;
+
+};
+
 class EfgInternal
 {
 public:
@@ -131,13 +178,14 @@ public:
     void CreateStructuredBuffer(EfgStructuredBuffer& buffer, void const* data, UINT size, uint32_t numElements, size_t stride);
     void CreateTexture2D(EfgTexture& texture, const wchar_t* filename);
     void CreateSampler(EfgSampler & sampler);
+    void CreateRootSignature(EfgRootSignature& rootSignature);
     void updateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size);
     void BindVertexBuffer(EfgVertexBuffer buffer);
     void BindIndexBuffer(EfgIndexBuffer buffer);
     void Bind2DTexture(const EfgTexture& texture);
     EfgResult CommitShaderResources();
     EfgProgram CreateProgram(LPCWSTR fileName);
-    EfgPSO CreateGraphicsPipelineState(EfgProgram program);
+    EfgPSO CreateGraphicsPipelineState(EfgProgram program, EfgRootSignature& rootSignature);
     void SetPipelineState(EfgPSO pso);
     void DrawInstanced(uint32_t vertexCount);
     void DrawIndexedInstanced(uint32_t indexCount);
@@ -232,10 +280,11 @@ EfgResult efgCreateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer,
 EfgResult efgCreateStructuredBuffer(EfgContext context, EfgStructuredBuffer& buffer, void const* data, UINT size, uint32_t count, size_t stride);
 EfgResult efgCreateTexture2D(EfgContext context, EfgTexture& texture, const wchar_t* filename);
 EfgResult efgCreateSampler(EfgContext context, EfgSampler& sampler);
+EfgResult efgCreateRootSignature(EfgContext context, EfgRootSignature& rootSignature);
 EfgResult efgUpdateConstantBuffer(EfgContext context, EfgConstantBuffer& buffer, void const* data, UINT size);
 EfgResult efgCommitShaderResources(EfgContext context);
 EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName);
-EfgPSO efgCreateGraphicsPipelineState(EfgContext context, EfgProgram program);
+EfgPSO efgCreateGraphicsPipelineState(EfgContext context, EfgProgram program, EfgRootSignature& rootSignature);
 EfgResult efgSetPipelineState(EfgContext efg, EfgPSO pso);
 EfgResult efgDrawInstanced(EfgContext efg, uint32_t vertexCount);
 EfgResult efgDrawIndexedInstanced(EfgContext efg, uint32_t indexCount);

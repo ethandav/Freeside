@@ -52,7 +52,7 @@ EfgProgram efgCreateProgram(EfgContext context, LPCWSTR fileName)
     return efg->CreateProgram(fileName);
 }
 
-EfgPSO efgCreateGraphicsPipelineState(EfgContext context, EfgProgram program)
+EfgPSO efgCreateGraphicsPipelineState(EfgContext context, EfgProgram program, EfgRootSignature& rootSignature)
 {
     EfgPSO pso = {};
     EfgInternal* efg = EfgInternal::GetEfg(context);
@@ -61,7 +61,7 @@ EfgPSO efgCreateGraphicsPipelineState(EfgContext context, EfgProgram program)
         EFG_SHOW_ERROR("Cannot commit shader resources: Invalid Context");
         return pso;
     }
-    EFG_INTERNAL_TRY_RET(efg->CreateGraphicsPipelineState(program), pso);
+    EFG_INTERNAL_TRY_RET(efg->CreateGraphicsPipelineState(program, rootSignature), pso);
 }
 
 EfgResult efgSetPipelineState(EfgContext context, EfgPSO pso)
@@ -227,6 +227,13 @@ EfgResult efgFrame(EfgContext context)
         return EfgResult_InvalidContext;
     }
     EFG_INTERNAL_TRY(efg->Frame());
+    return EfgResult_NoError;
+}
+
+EfgResult efgCreateRootSignature(EfgContext context, EfgRootSignature& rootSignature)
+{
+    EfgInternal* efg = EfgInternal::GetEfg(context);
+    EFG_INTERNAL_TRY(efg->CreateRootSignature(rootSignature));
     return EfgResult_NoError;
 }
 
@@ -594,7 +601,7 @@ void EfgInternal::Frame()
 
     // Set necessary state.
     //m_commandList->SetGraphicsRootSignature(m_boundPSO.rootSignature.Get());
-    m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+    m_commandList->SetGraphicsRootSignature(m_boundPSO.rootSignature.Get());
     m_commandList->RSSetViewports(1, &m_viewport);
     m_commandList->RSSetScissorRects(1, &m_scissorRect);
 
@@ -719,8 +726,6 @@ EfgResult EfgInternal::CommitShaderResources()
 {
     CreateCbvSrvDescriptorHeap(m_cbvDescriptorCount + m_srvDescriptorCount + m_textureCount);
     CreateSamplerDescriptorHeap(m_samplerCount);
-    if (!m_rootSignature)
-        CreateRootSignature(m_cbvDescriptorCount, m_srvDescriptorCount, m_samplerCount, m_textureCount);
 
     uint32_t heapOffset = 0;
     for (EfgConstantBuffer* buffer : m_constantBuffers) {
@@ -1081,7 +1086,7 @@ EfgProgram EfgInternal::CreateProgram(LPCWSTR fileName)
     return program;
 }
 
-EfgPSO EfgInternal::CreateGraphicsPipelineState(EfgProgram program)
+EfgPSO EfgInternal::CreateGraphicsPipelineState(EfgProgram program, EfgRootSignature& rootSignature)
 {
     EfgPSO pso = {};
     D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
@@ -1092,12 +1097,12 @@ EfgPSO EfgInternal::CreateGraphicsPipelineState(EfgProgram program)
         { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
     };
 
-    if (!m_rootSignature)
-        CreateRootSignature(0, 0, 0, 0);
+    pso.rootSignature = rootSignature.Get();
+    CommitShaderResources();
 
     // Describe and create the graphics pipeline state object (PSO).
     pso.desc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
-    pso.desc.pRootSignature = m_rootSignature.Get();
+    pso.desc.pRootSignature = rootSignature.Get().Get();
     pso.desc.VS = CD3DX12_SHADER_BYTECODE(program.vs.Get());
     pso.desc.PS = CD3DX12_SHADER_BYTECODE(program.ps.Get());
     pso.desc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -1165,4 +1170,65 @@ void EfgInternal::CheckD3DErrors()
         }
         infoQueue->ClearStoredMessages();
     }
+}
+
+D3D12_DESCRIPTOR_RANGE EfgDescriptorRange::Commit()
+{
+    D3D12_DESCRIPTOR_RANGE descriptorRange = {};
+    switch (rangeType)
+    {
+    case efgRange_CBV:
+        descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+        break;
+    case efgRange_SRV:
+        descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        break;
+    case efgRange_SAMPLER:
+        descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+        break;
+    }
+    descriptorRange.NumDescriptors = static_cast<UINT>(resources.size());
+    descriptorRange.BaseShaderRegister = baseShaderRegister;
+    descriptorRange.RegisterSpace = 0;
+    descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+    
+    return descriptorRange;
+}
+
+D3D12_ROOT_PARAMETER EfgRootParameter::Commit()
+{
+    D3D12_ROOT_PARAMETER rootParameter = {};
+    rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParameter.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(ranges.size());
+    rootParameter.DescriptorTable.pDescriptorRanges = ranges.data();
+    rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    return rootParameter;
+}
+
+ComPtr<ID3DBlob> EfgRootSignature::Serialize()
+{
+    rootSignatureDesc.NumParameters = static_cast<UINT>(rootParameters.size());
+    rootSignatureDesc.pParameters = rootParameters.data();
+    rootSignatureDesc.NumStaticSamplers = 0;
+    rootSignatureDesc.pStaticSamplers = nullptr;
+    rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+    ComPtr<ID3DBlob> serializedRootSignature;
+    ComPtr<ID3DBlob> errorBlob;
+    HRESULT hr = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &serializedRootSignature, &errorBlob);
+    if (FAILED(hr))
+    {
+        if (errorBlob)
+        {
+            OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+        }
+        throw EfgException(hr);
+    }
+    return serializedRootSignature;
+}
+
+void EfgInternal::CreateRootSignature(EfgRootSignature& rootSignature)
+{
+    ComPtr<ID3DBlob> serializedRootSignature = rootSignature.Serialize();
+    ThrowIfFailed(m_device->CreateRootSignature(0, serializedRootSignature->GetBufferPointer(), serializedRootSignature->GetBufferSize(), IID_PPV_ARGS(&rootSignature.Get())));
 }

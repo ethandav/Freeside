@@ -90,12 +90,14 @@ int main()
         viewProjBuffer,
         transformBuffer,
         viewPosBuffer,
+        newBuffer,
         materialBuffer,
         lightDataBuffer;
 
     efg.CreateConstantBuffer<XMMATRIX>(viewProjBuffer, &camera.viewProj, 1);
     efg.CreateConstantBuffer<XMMATRIX>(transformBuffer, &transformMatrix, 1);
     efg.CreateConstantBuffer<XMFLOAT3>(viewPosBuffer, &camera.eye, 1);
+    efg.CreateConstantBuffer<XMFLOAT3>(newBuffer, &camera.eye, 1);
     efg.CreateConstantBuffer<MaterialBuffer>(materialBuffer, &material, 1);
     efg.CreateConstantBuffer<LightBuffer>(lightDataBuffer, &lightData, 1);
 
@@ -110,12 +112,15 @@ int main()
     EfgSampler sampler;
     efg.CreateSampler(sampler);
 
+    efg.CommitShaderResources();
+
     EfgDescriptorRange range = EfgDescriptorRange(efgRange_CBV, 0);
     range.insert(viewProjBuffer);
     range.insert(transformBuffer);
     range.insert(viewPosBuffer);
-    range.insert(materialBuffer);
-    range.insert(lightDataBuffer);
+    EfgDescriptorRange range2 = EfgDescriptorRange(efgRange_CBV, 3);
+    range2.insert(materialBuffer);
+    range2.insert(lightDataBuffer);
 
     EfgDescriptorRange rangeSrv = EfgDescriptorRange(efgRange_SRV, 0);
     rangeSrv.insert(lightBuffer);
@@ -128,19 +133,22 @@ int main()
     EfgRootParameter rootParameter0;
     rootParameter0.insert(range);
     EfgRootParameter rootParameter1;
-    rootParameter1.insert(rangeSrv);
+    rootParameter1.insert(range2);
     EfgRootParameter rootParameter2;
-    rootParameter2.insert(rangeTex);
-    rootParameter2.data.conditionalBind = true;
-
+    rootParameter2.insert(rangeSrv);
     EfgRootParameter rootParameter3;
-    rootParameter3.insert(rangeSampler);
+    rootParameter3.insert(rangeTex);
+    rootParameter3.data.conditionalBind = true;
+
+    EfgRootParameter rootParameter4;
+    rootParameter4.insert(rangeSampler);
 
     EfgRootSignature rootSignature;
     rootSignature.insert(rootParameter0);
     rootSignature.insert(rootParameter1);
     rootSignature.insert(rootParameter2);
     rootSignature.insert(rootParameter3);
+    rootSignature.insert(rootParameter4);
     efg.CreateRootSignature(rootSignature);
 
     EfgProgram program = efg.CreateProgram(L"shaders.hlsl");
@@ -159,7 +167,7 @@ int main()
         efg.BindIndexBuffer(indexBuffer);
         efg.Bind2DTexture(texture);
         efg.DrawIndexedInstanced(square.indexCount);
-        efg.Bind2DTexture(texture2);
+        //efg.Bind2DTexture(texture2);
         efg.DrawIndexedInstanced(square.indexCount);
 
         efg.Render();

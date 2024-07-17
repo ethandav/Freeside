@@ -706,7 +706,6 @@ EfgPSO EfgContext::CreateGraphicsPipelineState(EfgProgram program, EfgRootSignat
     };
 
     pso.rootSignature = rootSignature.Get();
-    CommitShaderResources();
 
     // Describe and create the graphics pipeline state object (PSO).
     pso.desc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
@@ -745,7 +744,7 @@ void EfgContext::Bind2DTexture(const EfgTexture& texture)
 {
     m_boundTexture = &texture;
     CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), texture.heapOffset, m_cbvSrvDescriptorSize);
-    m_commandList->SetGraphicsRootDescriptorTable(2, gpuHandle);
+    m_commandList->SetGraphicsRootDescriptorTable(3, gpuHandle);
 }
 
 void EfgContext::CompileProgram(EfgProgram& program)
@@ -854,6 +853,7 @@ void EfgContext::BindRootDescriptorTable(EfgRootSignature& rootSignature)
             offset += rootSignature.parameterData[i].size;
             continue;
         }
+        offset = rootSignature.parameterData[i].offset;
         UINT descriptorSize = 0;
         switch (rootSignature.rootParameters[i].DescriptorTable.pDescriptorRanges->RangeType)
         {
@@ -871,6 +871,5 @@ void EfgContext::BindRootDescriptorTable(EfgRootSignature& rootSignature)
         }
         CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(heap->GetGPUDescriptorHandleForHeapStart(), offset, descriptorSize);
         m_commandList->SetGraphicsRootDescriptorTable(i, gpuHandle);
-        offset += rootSignature.parameterData[i].size;
     }
 }

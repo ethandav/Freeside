@@ -130,12 +130,17 @@ public:
     EfgDescriptorRange(EFG_RANGE_TYPE type, uint32_t baseRegister, uint32_t descriptors = 0) : rangeType(type), baseShaderRegister(baseRegister), numDescriptors(descriptors) {};
     template<typename TYPE> void insert(TYPE& resource) {
         resource.registerIndex = baseShaderRegister + (uint32_t)resources.size();
+        if (resources.size() == 0)
+            offset = resource.heapOffset;
+        if (resource.heapOffset < offset)
+            offset = resource.heapOffset;
         resources.push_back(&resource);
         numDescriptors++;
     };
     D3D12_DESCRIPTOR_RANGE Commit();
 
     uint32_t numDescriptors = 0;
+    UINT offset = 0;
 private:
     EFG_RANGE_TYPE rangeType;
     uint32_t baseShaderRegister = 0;
@@ -145,11 +150,19 @@ private:
 class EfgRootParameter
 {
 public:
-    void insert(EfgDescriptorRange& range) { ranges.push_back(range.Commit()); data.size += range.numDescriptors; };
+    void insert(EfgDescriptorRange& range) {
+        if (ranges.size() == 0)
+            data.offset = range.offset;
+        if (range.offset < data.offset)
+            data.offset = range.offset;
+        ranges.push_back(range.Commit());
+        data.size += range.numDescriptors;
+    };
     D3D12_ROOT_PARAMETER Commit();
 
     struct Data {
         uint32_t size = 0;
+        UINT offset = 0;
         bool conditionalBind = false;
         std::vector<EfgDescriptorRange*> rangeData;
     };

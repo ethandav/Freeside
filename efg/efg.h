@@ -137,7 +137,7 @@ public:
         resources.push_back(&resource);
         numDescriptors++;
     };
-    D3D12_DESCRIPTOR_RANGE Commit();
+    D3D12_DESCRIPTOR_RANGE Commit(bool useOffset);
 
     uint32_t numDescriptors = 0;
     UINT offset = 0;
@@ -151,11 +151,13 @@ class EfgRootParameter
 {
 public:
     void insert(EfgDescriptorRange& range) {
-        if (ranges.size() == 0)
+        bool useOffset = !ranges.empty();
+        if (useOffset && range.offset < data.offset) {
             data.offset = range.offset;
-        if (range.offset < data.offset)
+        } else if (!useOffset) {
             data.offset = range.offset;
-        ranges.push_back(range.Commit());
+        }
+        ranges.push_back(range.Commit(useOffset));
         data.size += range.numDescriptors;
     };
     D3D12_ROOT_PARAMETER Commit();

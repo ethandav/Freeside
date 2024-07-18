@@ -90,14 +90,16 @@ int main()
         viewProjBuffer,
         transformBuffer,
         viewPosBuffer,
-        newBuffer,
+        testBuffer,
+        testBuffer2,
         materialBuffer,
         lightDataBuffer;
 
     efg.CreateConstantBuffer<XMMATRIX>(viewProjBuffer, &camera.viewProj, 1);
     efg.CreateConstantBuffer<XMMATRIX>(transformBuffer, &transformMatrix, 1);
     efg.CreateConstantBuffer<XMFLOAT3>(viewPosBuffer, &camera.eye, 1);
-    efg.CreateConstantBuffer<XMFLOAT3>(newBuffer, &camera.eye, 1);
+    efg.CreateConstantBuffer<XMFLOAT3>(testBuffer, &camera.eye, 1);
+    efg.CreateConstantBuffer<XMFLOAT3>(testBuffer2, &camera.eye, 1);
     efg.CreateConstantBuffer<MaterialBuffer>(materialBuffer, &material, 1);
     efg.CreateConstantBuffer<LightBuffer>(lightDataBuffer, &lightData, 1);
 
@@ -132,8 +134,7 @@ int main()
 
     EfgRootParameter rootParameter0;
     rootParameter0.insert(range);
-    EfgRootParameter rootParameter1;
-    rootParameter1.insert(range2);
+    rootParameter0.insert(range2);
     EfgRootParameter rootParameter2;
     rootParameter2.insert(rangeSrv);
     EfgRootParameter rootParameter3;
@@ -145,7 +146,6 @@ int main()
 
     EfgRootSignature rootSignature;
     rootSignature.insert(rootParameter0);
-    rootSignature.insert(rootParameter1);
     rootSignature.insert(rootParameter2);
     rootSignature.insert(rootParameter3);
     rootSignature.insert(rootParameter4);

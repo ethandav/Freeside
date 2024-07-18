@@ -744,7 +744,7 @@ void EfgContext::Bind2DTexture(const EfgTexture& texture)
 {
     m_boundTexture = &texture;
     CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), texture.heapOffset, m_cbvSrvDescriptorSize);
-    m_commandList->SetGraphicsRootDescriptorTable(3, gpuHandle);
+    m_commandList->SetGraphicsRootDescriptorTable(2, gpuHandle);
 }
 
 void EfgContext::CompileProgram(EfgProgram& program)
@@ -781,7 +781,7 @@ void EfgContext::CheckD3DErrors()
     }
 }
 
-D3D12_DESCRIPTOR_RANGE EfgDescriptorRange::Commit()
+D3D12_DESCRIPTOR_RANGE EfgDescriptorRange::Commit(bool useOffset = false)
 {
     D3D12_DESCRIPTOR_RANGE descriptorRange = {};
     switch (rangeType)
@@ -799,7 +799,7 @@ D3D12_DESCRIPTOR_RANGE EfgDescriptorRange::Commit()
     descriptorRange.NumDescriptors = numDescriptors;
     descriptorRange.BaseShaderRegister = baseShaderRegister;
     descriptorRange.RegisterSpace = 0;
-    descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+    descriptorRange.OffsetInDescriptorsFromTableStart = useOffset ? offset : D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
     
     return descriptorRange;
 }
@@ -849,10 +849,7 @@ void EfgContext::BindRootDescriptorTable(EfgRootSignature& rootSignature)
     for (int i = 0; i < rootSignature.rootParameters.size(); i++)
     {
         if (rootSignature.parameterData[i].conditionalBind)
-        {
-            offset += rootSignature.parameterData[i].size;
             continue;
-        }
         offset = rootSignature.parameterData[i].offset;
         UINT descriptorSize = 0;
         switch (rootSignature.rootParameters[i].DescriptorTable.pDescriptorRanges->RangeType)

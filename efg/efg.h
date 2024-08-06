@@ -195,6 +195,7 @@ public:
 	void initialize(HWND window);
     EfgVertexBuffer CreateVertexBuffer(void const* data, UINT size);
     EfgIndexBuffer CreateIndexBuffer(void const* data, UINT size);
+    void CreateDepthBuffer();
     void CreateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size);
     void CreateStructuredBuffer(EfgStructuredBuffer& buffer, void const* data, UINT size, uint32_t numElements, size_t stride);
     void CreateTexture2D(EfgTexture& texture, const wchar_t* filename);
@@ -291,6 +292,8 @@ private:
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
     ComPtr<ID3D12DescriptorHeap> m_cbvSrvHeap;
     ComPtr<ID3D12DescriptorHeap> m_samplerHeap;
+    ComPtr<ID3D12DescriptorHeap> dsvHeap;
+    ComPtr<ID3D12Resource> depthStencilBuffer;
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
     ComPtr<ID3D12RootSignature> m_rootSignature;
     UINT m_rtvDescriptorSize = 0;

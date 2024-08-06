@@ -19,7 +19,6 @@ cbuffer TransformBuffer : register(b1)
     matrix transform;
 }
 
-
 cbuffer ViewBuffer : register(b2)
 {
     float3 viewPos;
@@ -50,7 +49,9 @@ struct LightData
 };
 StructuredBuffer<LightData> lights : register(t0);
 
-Texture2D diffuseMap: register(t1);
+StructuredBuffer<matrix> instances : register(t1);
+
+Texture2D diffuseMap: register(t2);
 SamplerState textureSampler : register(s0);
 
 cbuffer LightConstants : register(b4)
@@ -73,10 +74,10 @@ struct PSInput
     float2 uv : TEXCOORD;
 };
 
-PSInput VSMain(VSInput input)
+PSInput VSMain(VSInput input, uint InstanceID : SV_InstanceID)
 {
     PSInput result;
-    float4 worldPos = mul(transform, input.position);
+    float4 worldPos = mul(instances[InstanceID], input.position);
     float4 clipPos = mul(viewProjectionMatrix, worldPos);
 
     result.position = clipPos;

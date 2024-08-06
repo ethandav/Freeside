@@ -210,7 +210,7 @@ public:
     EfgPSO CreateGraphicsPipelineState(EfgProgram program, EfgRootSignature& rootSignature);
     void SetPipelineState(EfgPSO pso);
     void DrawInstanced(uint32_t vertexCount);
-    void DrawIndexedInstanced(uint32_t indexCount);
+    void DrawIndexedInstanced(uint32_t indexCount, uint32_t instanceCount = 1);
     void Frame();
     void Render();
     void Destroy();

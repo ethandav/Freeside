@@ -421,11 +421,11 @@ void EfgContext::DrawInstanced(uint32_t vertexCount)
     m_commandList->DrawInstanced(vertexCount, 1, 0, 0);
 }
 
-void EfgContext::DrawIndexedInstanced(uint32_t indexCount)
+void EfgContext::DrawIndexedInstanced(uint32_t indexCount, uint32_t instanceCount)
 {
     m_commandList->IASetVertexBuffers(0, 1, &m_boundVertexBuffer.view);
     m_commandList->IASetIndexBuffer(&m_boundIndexBuffer.view);
-    m_commandList->DrawIndexedInstanced(indexCount, 1, 0, 0, 0);
+    m_commandList->DrawIndexedInstanced(indexCount, instanceCount, 0, 0, 0);
 }
 
 void EfgContext::Destroy()

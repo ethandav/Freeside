@@ -4,6 +4,7 @@
 
 #include "Shapes.h"
 #include "efg_camera.h"
+#include <random>
 
 static std::wstring GetLatestWinPixGpuCapturerPath_Cpp17()
 {
@@ -47,8 +48,16 @@ int main()
     Camera camera = efgCreateCamera(efg, DirectX::XMFLOAT3(0.0f, 0.0f, -5.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f));
 
     Shape square = Shapes::getShape(Shapes::SPHERE);
+	std::mt19937 rng(std::random_device{}());
+	std::uniform_real_distribution<float> dist(-50.0f, 50.0f);
+    std::vector<XMMATRIX> transformMatrices;
+	transformMatrices.reserve(2000);
+	for (int i = 0; i < 2000; i++)
+	{
+		transformMatrices.push_back(efgCreateTransformMatrix(XMFLOAT3(dist(rng), dist(rng), dist(rng)), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f)));
+	}
     XMMATRIX transformMatrix = efgCreateTransformMatrix(XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f));
-    XMMATRIX transformMatrix2 = efgCreateTransformMatrix(XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f));
+    //XMMATRIX transformMatrix2 = efgCreateTransformMatrix(XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f));
 
     struct LightBuffer
     {
@@ -90,21 +99,20 @@ int main()
         viewProjBuffer,
         transformBuffer,
         viewPosBuffer,
-        testBuffer,
-        testBuffer2,
         materialBuffer,
         lightDataBuffer;
 
     efg.CreateConstantBuffer<XMMATRIX>(viewProjBuffer, &camera.viewProj, 1);
     efg.CreateConstantBuffer<XMMATRIX>(transformBuffer, &transformMatrix, 1);
     efg.CreateConstantBuffer<XMFLOAT3>(viewPosBuffer, &camera.eye, 1);
-    efg.CreateConstantBuffer<XMFLOAT3>(testBuffer, &camera.eye, 1);
-    efg.CreateConstantBuffer<XMFLOAT3>(testBuffer2, &camera.eye, 1);
     efg.CreateConstantBuffer<MaterialBuffer>(materialBuffer, &material, 1);
     efg.CreateConstantBuffer<LightBuffer>(lightDataBuffer, &lightData, 1);
 
     EfgStructuredBuffer lightBuffer;
     efg.CreateStructuredBuffer<LightBuffer>(lightBuffer, lights.data(), (uint32_t)lights.size());
+
+    EfgStructuredBuffer transformMatrixBuffer;
+    efg.CreateStructuredBuffer<LightBuffer>(transformMatrixBuffer, transformMatrices.data(), (uint32_t)transformMatrices.size());
 
     EfgTexture texture;
     efg.CreateTexture2D(texture, L"earth.jpeg");
@@ -120,21 +128,20 @@ int main()
     range.insert(viewProjBuffer);
     range.insert(transformBuffer);
     range.insert(viewPosBuffer);
-    EfgDescriptorRange range2 = EfgDescriptorRange(efgRange_CBV, 3);
-    range2.insert(materialBuffer);
-    range2.insert(lightDataBuffer);
+    range.insert(materialBuffer);
+    range.insert(lightDataBuffer);
 
     EfgDescriptorRange rangeSrv = EfgDescriptorRange(efgRange_SRV, 0);
     rangeSrv.insert(lightBuffer);
+    rangeSrv.insert(transformMatrixBuffer);
 
-    EfgDescriptorRange rangeTex = EfgDescriptorRange(efgRange_SRV, 1, 1);
+    EfgDescriptorRange rangeTex = EfgDescriptorRange(efgRange_SRV, 2, 1);
 
     EfgDescriptorRange rangeSampler = EfgDescriptorRange(efgRange_SAMPLER, 0);
     rangeSampler.insert(sampler);
 
     EfgRootParameter rootParameter0;
     rootParameter0.insert(range);
-    rootParameter0.insert(range2);
     EfgRootParameter rootParameter2;
     rootParameter2.insert(rangeSrv);
     EfgRootParameter rootParameter3;
@@ -166,9 +173,9 @@ int main()
         efg.BindVertexBuffer(vertexBuffer);
         efg.BindIndexBuffer(indexBuffer);
         efg.Bind2DTexture(texture);
-        efg.DrawIndexedInstanced(square.indexCount);
+        efg.DrawIndexedInstanced(square.indexCount, 2000);
         //efg.Bind2DTexture(texture2);
-        efg.DrawIndexedInstanced(square.indexCount);
+        //efg.DrawIndexedInstanced(square.indexCount);
 
         efg.Render();
     }

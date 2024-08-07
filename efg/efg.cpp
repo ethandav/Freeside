@@ -386,7 +386,7 @@ void EfgContext::CreateTextureView(EfgTextureInternal* texture, uint32_t heapOff
     m_device->CreateShaderResourceView(texture->resource.Get(), &srvDesc, texture->srvHandle);
 }
 
-void EfgContext::CommitSampler(EfgSampler* sampler, uint32_t heapOffset)
+void EfgContext::CommitSampler(EfgSamplerInternal* sampler, uint32_t heapOffset)
 {
     CD3DX12_CPU_DESCRIPTOR_HANDLE samplerHandle(m_samplerHeap->GetCPUDescriptorHandleForHeapStart());
     samplerHandle.Offset(heapOffset, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER));
@@ -416,7 +416,7 @@ EfgResult EfgContext::CommitShaderResources()
     }
 
     heapOffset = 0;
-    for (EfgSampler* sampler : m_samplers) {
+    for (EfgSamplerInternal* sampler : m_samplers) {
         CommitSampler(sampler, heapOffset);
         heapOffset++;
     }
@@ -509,7 +509,7 @@ ComPtr<ID3D12Resource> EfgContext::CreateBufferResource(EFG_CPU_ACCESS cpuAccess
     return resource;
 }
 
-void EfgContext::CreateBuffer(void const* data, EfgBuffer& buffer, EFG_CPU_ACCESS cpuAccess, D3D12_RESOURCE_STATES finalState)
+void EfgContext::CreateBuffer(void const* data, EfgBufferInternal& buffer, EFG_CPU_ACCESS cpuAccess, D3D12_RESOURCE_STATES finalState)
 {
     ComPtr<ID3D12Resource> uploadBuffer = CreateBufferResource(EFG_CPU_WRITE, buffer.alignmentSize);
     
@@ -647,30 +647,38 @@ EfgIndexBuffer EfgContext::CreateIndexBuffer(void const* data, UINT size)
     return buffer;
 }
 
-void EfgContext::CreateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size)
+EfgBuffer EfgContext::CreateConstantBuffer(void const* data, UINT size)
 {
-    buffer.size = size;
-    buffer.alignmentSize = (size + 255) & ~255;
-    buffer.type = EFG_CONSTANT_BUFFER;
-    CreateBuffer(data, buffer, EFG_CPU_WRITE, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+    EfgBuffer buffer = {};
+    EfgConstantBuffer* bufferInternal = new EfgConstantBuffer();
 
-    m_constantBuffers.push_back(&buffer);
-
+    buffer.handle = reinterpret_cast<uint64_t>(bufferInternal);
+    bufferInternal->size = size;
+    bufferInternal->alignmentSize = (size + 255) & ~255;
+    bufferInternal->type = EFG_CONSTANT_BUFFER;
+    CreateBuffer(data, *bufferInternal, EFG_CPU_WRITE, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+    m_constantBuffers.push_back(bufferInternal);
     m_cbvDescriptorCount++;
+
+    return buffer;
 }
 
-void EfgContext::CreateStructuredBuffer(EfgStructuredBuffer& buffer, void const* data, UINT size, uint32_t count, size_t stride)
+EfgBuffer EfgContext::CreateStructuredBuffer(void const* data, UINT size, uint32_t count, size_t stride)
 {
-    buffer.size = size;
-    buffer.alignmentSize = size;
-    buffer.type = EFG_STRUCTURED_BUFFER;
-    buffer.count = count;
-    buffer.stride = stride;
-    CreateBuffer(data, buffer, EFG_CPU_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    EfgBuffer buffer = {};
+    EfgStructuredBuffer* bufferInternal = new EfgStructuredBuffer();
 
-    m_structuredBuffers.push_back(&buffer);
-
+    buffer.handle = reinterpret_cast<uint64_t>(bufferInternal);
+    bufferInternal->size = size;
+    bufferInternal->alignmentSize = size;
+    bufferInternal->type = EFG_STRUCTURED_BUFFER;
+    bufferInternal->count = count;
+    bufferInternal->stride = stride;
+    CreateBuffer(data, *bufferInternal, EFG_CPU_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    m_structuredBuffers.push_back(bufferInternal);
     m_srvDescriptorCount++;
+
+    return buffer;
 }
 
 EfgTexture EfgContext::CreateTexture2D(const wchar_t* filename)
@@ -689,37 +697,40 @@ EfgTexture EfgContext::CreateTexture2D(const wchar_t* filename)
     return texture;
 }
 
-void EfgContext::CreateSampler(EfgSampler& sampler)
+EfgSampler EfgContext::CreateSampler()
 {
-    sampler.desc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-    sampler.desc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    sampler.desc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    sampler.desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    sampler.desc.MipLODBias = 0.0f;
-    sampler.desc.MaxAnisotropy = 1;
-    sampler.desc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-    sampler.desc.BorderColor[0] = 1.0f;
-    sampler.desc.BorderColor[1] = 1.0f;
-    sampler.desc.BorderColor[2] = 1.0f;
-    sampler.desc.BorderColor[3] = 1.0f;
-    sampler.desc.MinLOD = 0.0f;
-    sampler.desc.MaxLOD = D3D12_FLOAT32_MAX;
-
-    m_samplers.push_back(&sampler);
-    
+    EfgSampler sampler = {};
+    EfgSamplerInternal* samplerInternal = new EfgSamplerInternal();
+    sampler.handle = reinterpret_cast<uint64_t>(samplerInternal);
+    samplerInternal->desc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    samplerInternal->desc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    samplerInternal->desc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    samplerInternal->desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    samplerInternal->desc.MipLODBias = 0.0f;
+    samplerInternal->desc.MaxAnisotropy = 1;
+    samplerInternal->desc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    samplerInternal->desc.BorderColor[0] = 1.0f;
+    samplerInternal->desc.BorderColor[1] = 1.0f;
+    samplerInternal->desc.BorderColor[2] = 1.0f;
+    samplerInternal->desc.BorderColor[3] = 1.0f;
+    samplerInternal->desc.MinLOD = 0.0f;
+    samplerInternal->desc.MaxLOD = D3D12_FLOAT32_MAX;
+    m_samplers.push_back(samplerInternal);
     m_samplerCount++;
 
+    return sampler;
 }
 
-void EfgContext::UpdateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size)
+void EfgContext::UpdateConstantBuffer(EfgBuffer& buffer, void const* data, UINT size)
 {
+    EfgConstantBuffer* bufferInternal = reinterpret_cast<EfgConstantBuffer*>(buffer.handle);
     void* mappedData = nullptr;
     D3D12_RANGE readRange = { 0, 0 };
     D3D12_RANGE writeRange = { 0, size };
-    buffer.m_bufferResource->Map(0, &readRange, &mappedData);
+    bufferInternal->m_bufferResource->Map(0, &readRange, &mappedData);
     if (mappedData)
         memcpy(mappedData, data, (size_t)size);
-    buffer.m_bufferResource->Unmap(0, &writeRange);
+    bufferInternal->m_bufferResource->Unmap(0, &writeRange);
 }
 
 void EfgContext::WaitForGpu()

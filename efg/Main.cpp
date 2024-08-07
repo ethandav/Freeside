@@ -98,30 +98,19 @@ int main()
     EfgVertexBuffer vertexBuffer = efg.CreateVertexBuffer<Vertex>(square.vertices.data(), square.vertexCount);
     EfgIndexBuffer indexBuffer = efg.CreateIndexBuffer<uint32_t>(square.indices.data(), square.indexCount);
 
-    EfgConstantBuffer
-        viewProjBuffer,
-        transformBuffer,
-        viewPosBuffer,
-        materialBuffer,
-        lightDataBuffer;
+    EfgBuffer viewProjBuffer = efg.CreateConstantBuffer<XMMATRIX>(&camera.viewProj, 1);
+    EfgBuffer transformBuffer = efg.CreateConstantBuffer<XMMATRIX>(&transformMatrix, 1);
+    EfgBuffer viewPosBuffer = efg.CreateConstantBuffer<XMFLOAT3>(&camera.eye, 1);
+    EfgBuffer materialBuffer = efg.CreateConstantBuffer<MaterialBuffer>(&material, 1);
+    EfgBuffer lightDataBuffer = efg.CreateConstantBuffer<LightBuffer>(&lightData, 1);
 
-    efg.CreateConstantBuffer<XMMATRIX>(viewProjBuffer, &camera.viewProj, 1);
-    efg.CreateConstantBuffer<XMMATRIX>(transformBuffer, &transformMatrix, 1);
-    efg.CreateConstantBuffer<XMFLOAT3>(viewPosBuffer, &camera.eye, 1);
-    efg.CreateConstantBuffer<MaterialBuffer>(materialBuffer, &material, 1);
-    efg.CreateConstantBuffer<LightBuffer>(lightDataBuffer, &lightData, 1);
-
-    EfgStructuredBuffer lightBuffer;
-    efg.CreateStructuredBuffer<LightBuffer>(lightBuffer, lights.data(), (uint32_t)lights.size());
-
-    EfgStructuredBuffer transformMatrixBuffer;
-    efg.CreateStructuredBuffer<LightBuffer>(transformMatrixBuffer, transformMatrices.data(), (uint32_t)transformMatrices.size());
+    EfgBuffer lightBuffer = efg.CreateStructuredBuffer<LightBuffer>(lights.data(), (uint32_t)lights.size());
+    EfgBuffer transformMatrixBuffer = efg.CreateStructuredBuffer<LightBuffer>(transformMatrices.data(), (uint32_t)transformMatrices.size());
 
     EfgTexture texture = efg.CreateTexture2D(L"earth.jpeg");
     EfgTexture texture2 = efg.CreateTexture2D(L"water.jpg");
 
-    EfgSampler sampler;
-    efg.CreateSampler(sampler);
+    EfgSampler sampler = efg.CreateSampler();
 
     efg.CommitShaderResources();
 

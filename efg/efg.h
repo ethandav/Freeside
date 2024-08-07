@@ -59,12 +59,6 @@ enum EFG_RANGE_TYPE
     efgRange_SAMPLER
 };
 
-struct EfgResourceInternal
-{
-    uint32_t heapOffset = 0;
-    ComPtr<ID3D12Resource> resource;
-};
-
 struct EfgResource
 {
     uint32_t heapOffset = 0;
@@ -104,12 +98,17 @@ struct EfgStructuredBuffer: public EfgBuffer
     CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle = {};
 };
 
-struct EfgTexture : EfgResource
+struct EfgTextureInternal : EfgResource
 {
-    uint32_t index = 0;
+    ComPtr<ID3D12Resource> resource;
     D3D12_SHADER_RESOURCE_VIEW_DESC viewDesc = {};
     CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle = {};
-    EfgResourceInternal* internal;
+};
+
+struct EfgTexture
+{
+    uint32_t index = 0;
+    uint64_t handle = 0;
 };
 
 struct EfgSampler : EfgResource
@@ -297,7 +296,7 @@ private:
     void CreateSamplerDescriptorHeap(uint32_t samplerCount);
     EfgResult CreateConstantBufferView(EfgConstantBuffer* buffer, uint32_t heapOffset);
     EfgResult CreateStructuredBufferView(EfgStructuredBuffer* buffer, uint32_t heapOffset);
-    void CreateTextureView(EfgResourceInternal* texture, uint32_t heapOffset);
+    void CreateTextureView(EfgTextureInternal* texture, uint32_t heapOffset);
     void CommitSampler(EfgSampler * sampler, uint32_t heapOffset);
 
 	HWND window_ = {};
@@ -332,7 +331,7 @@ private:
     uint32_t m_samplerCount = 0;
     std::list<EfgConstantBuffer*> m_constantBuffers = {};
     std::list<EfgStructuredBuffer*> m_structuredBuffers = {};
-    std::list<EfgResourceInternal*> m_textures = {};
+    std::list<EfgTextureInternal*> m_textures = {};
     std::list<EfgSampler*> m_samplers = {};
 
     EfgPSO m_boundPSO = {};

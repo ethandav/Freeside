@@ -370,7 +370,7 @@ EfgResult EfgContext::CreateStructuredBufferView(EfgStructuredBuffer* buffer, ui
     return EfgResult_NoError;
 }
 
-void EfgContext::CreateTextureView(EfgResourceInternal* texture, uint32_t heapOffset)
+void EfgContext::CreateTextureView(EfgTextureInternal* texture, uint32_t heapOffset)
 {
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -380,11 +380,10 @@ void EfgContext::CreateTextureView(EfgResourceInternal* texture, uint32_t heapOf
     srvDesc.Texture2D.MipLevels = texture->resource.Get()->GetDesc().MipLevels;
     srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
     texture->heapOffset = heapOffset;
-    CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle;
-    srvHandle = m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart();
-    srvHandle.Offset(heapOffset, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
+    texture->srvHandle = m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart();
+    texture->srvHandle.Offset(heapOffset, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
 
-    m_device->CreateShaderResourceView(texture->resource.Get(), &srvDesc, srvHandle);
+    m_device->CreateShaderResourceView(texture->resource.Get(), &srvDesc, texture->srvHandle);
 }
 
 void EfgContext::CommitSampler(EfgSampler* sampler, uint32_t heapOffset)
@@ -411,9 +410,8 @@ EfgResult EfgContext::CommitShaderResources()
         heapOffset++;
     }
 
-    for (auto& texture : m_textures) {
+    for (EfgTextureInternal* texture : m_textures) {
         CreateTextureView(texture, heapOffset);
-        texture->heapOffset = heapOffset;
         heapOffset++;
     }
 
@@ -445,11 +443,6 @@ void EfgContext::Destroy()
     WaitForPreviousFrame();
 
     CloseHandle(m_fenceEvent);
-
-    for (auto& textures : m_textures)
-    {
-        delete textures;
-    }
 }
 
 void EfgContext::WaitForPreviousFrame()
@@ -682,15 +675,16 @@ void EfgContext::CreateStructuredBuffer(EfgStructuredBuffer& buffer, void const*
 
 EfgTexture EfgContext::CreateTexture2D(const wchar_t* filename)
 {
-    EfgTexture texture;
-    texture.internal = new EfgResourceInternal();
+    EfgTexture texture = {};
+    EfgTextureInternal* textureInternal = new EfgTextureInternal();
+    texture.handle = reinterpret_cast<uint64_t>(textureInternal);
     ResourceUploadBatch resourceUpload(m_device.Get());
     resourceUpload.Begin();
-    EFG_D3D_TRY(CreateWICTextureFromFile(m_device.Get(), resourceUpload, filename, texture.internal->resource.ReleaseAndGetAddressOf()));
+    EFG_D3D_TRY(CreateWICTextureFromFile(m_device.Get(), resourceUpload, filename, textureInternal->resource.ReleaseAndGetAddressOf()));
     auto uploadResourcesFinished = resourceUpload.End(m_commandQueue.Get());
     uploadResourcesFinished.wait();
     texture.index = m_textureCount;
-    m_textures.push_back(std::move(texture.internal));
+    m_textures.push_back(textureInternal);
     m_textureCount++;
     return texture;
 }
@@ -809,7 +803,8 @@ void EfgContext::BindIndexBuffer(EfgIndexBuffer buffer)
 void EfgContext::Bind2DTexture(const EfgTexture& texture)
 {
     m_boundTexture = &texture;
-    CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), texture.internal->heapOffset, m_cbvSrvDescriptorSize);
+    EfgTextureInternal* textureInternal = reinterpret_cast<EfgTextureInternal*>(texture.handle);
+    CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), textureInternal->heapOffset, m_cbvSrvDescriptorSize);
     m_commandList->SetGraphicsRootDescriptorTable(2, gpuHandle);
 }
 

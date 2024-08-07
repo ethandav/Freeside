@@ -2,6 +2,9 @@
 #include "efg_exception.h"
 #include <iostream>
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "../../tinyobjloader/tiny_obj_loader.h"
+
 XMMATRIX efgCreateTransformMatrix(XMFLOAT3 translation, XMFLOAT3 rotation, XMFLOAT3 scale)
 {
     XMVECTOR rotationRadians = XMVectorSet(XMConvertToRadians(rotation.x), XMConvertToRadians(rotation.y), XMConvertToRadians(rotation.z), 0.0f);
@@ -367,7 +370,7 @@ EfgResult EfgContext::CreateStructuredBufferView(EfgStructuredBuffer* buffer, ui
     return EfgResult_NoError;
 }
 
-void EfgContext::CreateTextureView(EfgTexture* texture, uint32_t heapOffset)
+void EfgContext::CreateTextureView(EfgResourceInternal* texture, uint32_t heapOffset)
 {
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -377,10 +380,11 @@ void EfgContext::CreateTextureView(EfgTexture* texture, uint32_t heapOffset)
     srvDesc.Texture2D.MipLevels = texture->resource.Get()->GetDesc().MipLevels;
     srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
     texture->heapOffset = heapOffset;
-    texture->srvHandle = m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart();
-    texture->srvHandle.Offset(heapOffset, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
+    CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle;
+    srvHandle = m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart();
+    srvHandle.Offset(heapOffset, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
 
-    m_device->CreateShaderResourceView(texture->resource.Get(), &srvDesc, texture->srvHandle);
+    m_device->CreateShaderResourceView(texture->resource.Get(), &srvDesc, srvHandle);
 }
 
 void EfgContext::CommitSampler(EfgSampler* sampler, uint32_t heapOffset)
@@ -407,8 +411,9 @@ EfgResult EfgContext::CommitShaderResources()
         heapOffset++;
     }
 
-    for (EfgTexture* texture : m_textures) {
+    for (auto& texture : m_textures) {
         CreateTextureView(texture, heapOffset);
+        texture->heapOffset = heapOffset;
         heapOffset++;
     }
 
@@ -440,6 +445,11 @@ void EfgContext::Destroy()
     WaitForPreviousFrame();
 
     CloseHandle(m_fenceEvent);
+
+    for (auto& textures : m_textures)
+    {
+        delete textures;
+    }
 }
 
 void EfgContext::WaitForPreviousFrame()
@@ -670,16 +680,19 @@ void EfgContext::CreateStructuredBuffer(EfgStructuredBuffer& buffer, void const*
     m_srvDescriptorCount++;
 }
 
-void EfgContext::CreateTexture2D(EfgTexture& texture, const wchar_t* filename)
+EfgTexture EfgContext::CreateTexture2D(const wchar_t* filename)
 {
+    EfgTexture texture;
+    texture.internal = new EfgResourceInternal();
     ResourceUploadBatch resourceUpload(m_device.Get());
     resourceUpload.Begin();
-    EFG_D3D_TRY(CreateWICTextureFromFile(m_device.Get(), resourceUpload, filename, texture.resource.ReleaseAndGetAddressOf()));
+    EFG_D3D_TRY(CreateWICTextureFromFile(m_device.Get(), resourceUpload, filename, texture.internal->resource.ReleaseAndGetAddressOf()));
     auto uploadResourcesFinished = resourceUpload.End(m_commandQueue.Get());
     uploadResourcesFinished.wait();
     texture.index = m_textureCount;
-    m_textures.push_back(&texture);
+    m_textures.push_back(std::move(texture.internal));
     m_textureCount++;
+    return texture;
 }
 
 void EfgContext::CreateSampler(EfgSampler& sampler)
@@ -796,7 +809,7 @@ void EfgContext::BindIndexBuffer(EfgIndexBuffer buffer)
 void EfgContext::Bind2DTexture(const EfgTexture& texture)
 {
     m_boundTexture = &texture;
-    CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), texture.heapOffset, m_cbvSrvDescriptorSize);
+    CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), texture.internal->heapOffset, m_cbvSrvDescriptorSize);
     m_commandList->SetGraphicsRootDescriptorTable(2, gpuHandle);
 }
 
@@ -922,4 +935,101 @@ void EfgContext::BindRootDescriptorTable(EfgRootSignature& rootSignature)
         CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(heap->GetGPUDescriptorHandleForHeapStart(), offset, descriptorSize);
         m_commandList->SetGraphicsRootDescriptorTable(i, gpuHandle);
     }
+}
+
+std::vector<EfgInstanceBatch> EfgContext::LoadFromObj(const char* basePath, const char* file)
+{
+    std::vector<EfgInstanceBatch> uploadBatch;
+    std::vector<EfgMaterial> uploadMaterials;
+    tinyobj::ObjReaderConfig readerConfig;
+    readerConfig.mtl_search_path = basePath;
+
+    tinyobj::ObjReader reader;
+/*
+    if (!reader.ParseFromFile(file, readerConfig))
+    {
+        if (!reader.Error().empty())
+        {
+            std::cerr << "TinyObjReader: " << reader.Error();
+        }
+        exit(1);
+    }
+
+    if (!reader.Warning().empty())
+    {
+        std::cout << "TinyObjReader: " << reader.Warning();
+    }
+
+    auto& attrib = reader.GetAttrib();
+    auto shapes = reader.GetShapes();
+    auto materials = reader.GetMaterials();
+
+    for (size_t m = 0; m < materials.size(); m++)
+    {
+        EfgMaterial mat;
+
+        mat.index = m;
+        if (!materials[m].diffuse_texname.empty())
+        {
+            std::string texPath = std::string(basePath) + "\\" + materials[m].diffuse_texname;
+            std::wstring w_texPath(texPath.begin(), texPath.end());
+            mat.diffuse_texname = materials[m].diffuse_texname;
+            CreateTexture2D(mat.diffuseTexture, w_texPath.c_str());
+        }
+
+        uploadMaterials.push_back(mat);
+    }
+
+    // Loop over shapes
+    for (size_t s = 0; s < shapes.size(); s++) {
+      EfgInstanceBatch batch;
+      // Loop over faces(polygon)
+      size_t index_offset = 0;
+      for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
+        size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
+        // Loop over vertices in the face.
+        for (size_t v = 0; v < fv; v++) {
+          Vertex vertex;
+          // access to vertex
+          tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
+          vertex.position.x = attrib.vertices[3*size_t(idx.vertex_index)+0];
+          vertex.position.y = attrib.vertices[3*size_t(idx.vertex_index)+1];
+          vertex.position.z = attrib.vertices[3*size_t(idx.vertex_index)+2];
+    
+          // Check if `normal_index` is zero or positive. negative = no normal data
+          if (idx.normal_index >= 0) {
+            vertex.normal.x = attrib.normals[3*size_t(idx.normal_index)+0];
+            vertex.normal.y = attrib.normals[3*size_t(idx.normal_index)+1];
+            vertex.normal.z = attrib.normals[3*size_t(idx.normal_index)+2];
+          }
+    
+          // Check if `texcoord_index` is zero or positive. negative = no texcoord data
+          if (idx.texcoord_index >= 0) {
+            vertex.uv.x = attrib.texcoords[2*size_t(idx.texcoord_index)+0];
+            vertex.uv.y = attrib.texcoords[2*size_t(idx.texcoord_index)+1];
+          }
+    
+          // Optional: vertex colors
+          // tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
+          // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
+          // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
+          batch.vertices.push_back(vertex);
+          batch.indices.push_back(batch.indices.size());
+        }
+        index_offset += fv;
+    
+        // per-face material
+        //shapes[s].mesh.material_ids[f];
+      }
+      batch.vertexBuffer = CreateVertexBuffer<Vertex>(batch.vertices.data(), batch.vertices.size());
+      batch.indexBuffer = CreateIndexBuffer<uint32_t>(batch.indices.data(), batch.indices.size());
+      batch.indexCount = batch.indices.size();
+
+      for (auto& mat_id : shapes[s].mesh.material_ids)
+          batch.materials.push_back(uploadMaterials[mat_id]);
+
+      uploadBatch.push_back(batch);
+    }
+*/
+    return uploadBatch;
 }

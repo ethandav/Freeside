@@ -59,6 +59,12 @@ enum EFG_RANGE_TYPE
     efgRange_SAMPLER
 };
 
+struct EfgResourceInternal
+{
+    uint32_t heapOffset = 0;
+    ComPtr<ID3D12Resource> resource;
+};
+
 struct EfgResource
 {
     uint32_t heapOffset = 0;
@@ -81,6 +87,7 @@ struct EfgVertexBuffer : public EfgBuffer
 struct EfgIndexBuffer : public EfgBuffer
 {
     D3D12_INDEX_BUFFER_VIEW view = {};
+    uint32_t indexCount = 0;
 };
 
 struct EfgConstantBuffer : public EfgBuffer
@@ -100,9 +107,9 @@ struct EfgStructuredBuffer: public EfgBuffer
 struct EfgTexture : EfgResource
 {
     uint32_t index = 0;
-    ComPtr<ID3D12Resource> resource;
     D3D12_SHADER_RESOURCE_VIEW_DESC viewDesc = {};
     CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle = {};
+    EfgResourceInternal* internal;
 };
 
 struct EfgSampler : EfgResource
@@ -122,6 +129,23 @@ struct EfgProgram
     std::wstring source;
     ComPtr<ID3DBlob> vs;
     ComPtr<ID3DBlob> ps;
+};
+
+struct EfgMaterial
+{
+    uint32_t index = 0;
+    std::string diffuse_texname;
+    EfgTexture diffuseTexture = {};
+};
+
+struct EfgInstanceBatch
+{
+    EfgVertexBuffer vertexBuffer = {};
+    EfgIndexBuffer indexBuffer = {};
+    uint32_t indexCount = 0;
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
+    std::vector<EfgMaterial> materials;
 };
 
 class EfgDescriptorRange
@@ -198,7 +222,7 @@ public:
     void CreateDepthBuffer();
     void CreateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size);
     void CreateStructuredBuffer(EfgStructuredBuffer& buffer, void const* data, UINT size, uint32_t numElements, size_t stride);
-    void CreateTexture2D(EfgTexture& texture, const wchar_t* filename);
+    EfgTexture CreateTexture2D(const wchar_t* filename);
     void CreateSampler(EfgSampler & sampler);
     void CreateRootSignature(EfgRootSignature& rootSignature);
     void UpdateConstantBuffer(EfgConstantBuffer& buffer, void const* data, UINT size);
@@ -212,6 +236,7 @@ public:
     void SetPipelineState(EfgPSO pso);
     void DrawInstanced(uint32_t vertexCount);
     void DrawIndexedInstanced(uint32_t indexCount, uint32_t instanceCount = 1);
+    std::vector<EfgInstanceBatch> LoadFromObj(const char* basePath, const char* file);
     void Frame();
     void Render();
     void Destroy();
@@ -244,6 +269,8 @@ public:
         CreateStructuredBuffer(buffer, data, count * sizeof(TYPE), count, stride);
     }
 
+    std::vector<EfgMaterial> uploadMaterials;
+
 private:
     void GetHardwareAdapter(
         _In_ IDXGIFactory1* pFactory,
@@ -270,7 +297,7 @@ private:
     void CreateSamplerDescriptorHeap(uint32_t samplerCount);
     EfgResult CreateConstantBufferView(EfgConstantBuffer* buffer, uint32_t heapOffset);
     EfgResult CreateStructuredBufferView(EfgStructuredBuffer* buffer, uint32_t heapOffset);
-    void CreateTextureView(EfgTexture* texture, uint32_t heapOffset);
+    void CreateTextureView(EfgResourceInternal* texture, uint32_t heapOffset);
     void CommitSampler(EfgSampler * sampler, uint32_t heapOffset);
 
 	HWND window_ = {};
@@ -305,13 +332,14 @@ private:
     uint32_t m_samplerCount = 0;
     std::list<EfgConstantBuffer*> m_constantBuffers = {};
     std::list<EfgStructuredBuffer*> m_structuredBuffers = {};
-    std::list<EfgTexture*> m_textures = {};
+    std::list<EfgResourceInternal*> m_textures = {};
     std::list<EfgSampler*> m_samplers = {};
 
     EfgPSO m_boundPSO = {};
     EfgVertexBuffer m_boundVertexBuffer = {};
     EfgIndexBuffer m_boundIndexBuffer = {};
     const EfgTexture* m_boundTexture = nullptr;
+
 
     // Synchronization objects.
     UINT m_frameIndex = 0;

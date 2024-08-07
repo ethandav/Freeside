@@ -47,16 +47,19 @@ int main()
     efg.initialize(efgWindow);
     Camera camera = efgCreateCamera(efg, DirectX::XMFLOAT3(0.0f, 0.0f, -5.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f));
 
+    std::vector<EfgInstanceBatch> batch = efg.LoadFromObj("C:\\Users\\Ethan\\Documents\\sibenik", "C:\\Users\\Ethan\\Documents\\sibenik\\sibenik.obj");
+
     Shape square = Shapes::getShape(Shapes::SPHERE);
-	std::mt19937 rng(std::random_device{}());
-	std::uniform_real_distribution<float> dist(-50.0f, 50.0f);
+	//std::mt19937 rng(std::random_device{}());
+	//std::uniform_real_distribution<float> dist(-50.0f, 50.0f);
     std::vector<XMMATRIX> transformMatrices;
-	transformMatrices.reserve(2000);
-	for (int i = 0; i < 2000; i++)
-	{
-		transformMatrices.push_back(efgCreateTransformMatrix(XMFLOAT3(dist(rng), dist(rng), dist(rng)), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f)));
-	}
+	//transformMatrices.reserve(2000);
+	//for (int i = 0; i < 2000; i++)
+	//{
+	//	transformMatrices.push_back(efgCreateTransformMatrix(XMFLOAT3(dist(rng), dist(rng), dist(rng)), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f)));
+	//}
     XMMATRIX transformMatrix = efgCreateTransformMatrix(XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f));
+    transformMatrices.push_back(transformMatrix);
     //XMMATRIX transformMatrix2 = efgCreateTransformMatrix(XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f));
 
     struct LightBuffer
@@ -114,10 +117,8 @@ int main()
     EfgStructuredBuffer transformMatrixBuffer;
     efg.CreateStructuredBuffer<LightBuffer>(transformMatrixBuffer, transformMatrices.data(), (uint32_t)transformMatrices.size());
 
-    EfgTexture texture;
-    efg.CreateTexture2D(texture, L"earth.jpeg");
-    EfgTexture texture2;
-    efg.CreateTexture2D(texture2, L"water.jpg");
+    EfgTexture texture = efg.CreateTexture2D(L"earth.jpeg");
+    EfgTexture texture2 = efg.CreateTexture2D(L"water.jpg");
 
     EfgSampler sampler;
     efg.CreateSampler(sampler);
@@ -174,8 +175,18 @@ int main()
         efg.BindIndexBuffer(indexBuffer);
         efg.Bind2DTexture(texture);
         efg.DrawIndexedInstanced(square.indexCount, 2000);
-        //efg.Bind2DTexture(texture2);
-        //efg.DrawIndexedInstanced(square.indexCount);
+
+        //for (auto& instances : batch)
+        //{
+        //    for (auto& material : instances.materials)
+        //    {
+        //        if(!material.diffuse_texname.empty())
+        //            efg.Bind2DTexture(material.diffuseTexture);
+        //    }
+        //    efg.BindVertexBuffer(instances.vertexBuffer);
+        //    efg.BindIndexBuffer(instances.indexBuffer);
+        //    efg.DrawIndexedInstanced(instances.indexCount);
+        //}
 
         efg.Render();
     }

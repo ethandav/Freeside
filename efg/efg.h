@@ -141,21 +141,8 @@ struct EfgProgram
     ComPtr<ID3DBlob> ps;
 };
 
-struct EfgMaterial
+struct EfgMaterialTextures
 {
-    XMFLOAT4 ambient = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
-    XMFLOAT4 diffuse = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
-    XMFLOAT4 specular = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
-    XMFLOAT4 transmittance = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
-    XMFLOAT4 emission = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
-    float shininess = 0.0f;
-    float roughness = 1.0f;
-    float metallic = 0.0f;
-    float ior = 1.5f;
-    float dissolve = 1.5f;
-    float clearcoat = 0.0f;
-    float clearcoat_roughness = 0.0f;
-
     EfgTexture diffuse_map;
     EfgTexture roughness_map;
     EfgTexture metallicity_map;
@@ -169,6 +156,24 @@ struct EfgMaterial
     EfgTexture ao_map;
 };
 
+struct EfgMaterialBuffer
+{
+    XMFLOAT4 ambient = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+    XMFLOAT4 diffuse = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+    XMFLOAT4 specular = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+    XMFLOAT4 transmittance = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+    XMFLOAT4 emission = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+    float shininess = 0.0f;
+    float roughness = 1.0f;
+    float metallic = 0.0f;
+    float ior = 1.5f;
+    float dissolve = 1.5f;
+    float clearcoat = 0.0f;
+    float clearcoat_roughness = 0.0f;
+    int diffuseMapFlag = 0;
+    float padding[3] = { 0.0f, 0.0f, 0.0f };
+};
+
 struct EfgInstanceBatch
 {
     EfgVertexBuffer vertexBuffer = {};
@@ -176,12 +181,12 @@ struct EfgInstanceBatch
     uint32_t indexCount = 0;
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
-    std::vector<EfgMaterial> materials;
 };
 
 struct EfgImportMesh
 {
-    std::vector<EfgMaterial> uploadMaterials;
+    std::vector<EfgBuffer> materialBuffers;
+    std::vector<EfgMaterialTextures> textures;
     std::unordered_map<int, EfgInstanceBatch> materialBatches;
 };
 
@@ -267,6 +272,7 @@ public:
     void BindVertexBuffer(EfgVertexBuffer buffer);
     void BindIndexBuffer(EfgIndexBuffer buffer);
     void Bind2DTexture(const EfgTexture& texture);
+    void BindConstantBuffer(const EfgBuffer& texture);
     void BindRootDescriptorTable(EfgRootSignature& rootSignature);
     EfgResult CommitShaderResources();
     EfgProgram CreateProgram(LPCWSTR fileName);

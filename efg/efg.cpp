@@ -816,7 +816,14 @@ void EfgContext::Bind2DTexture(const EfgTexture& texture)
     m_boundTexture = &texture;
     EfgTextureInternal* textureInternal = reinterpret_cast<EfgTextureInternal*>(texture.handle);
     CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), textureInternal->heapOffset, m_cbvSrvDescriptorSize);
-    m_commandList->SetGraphicsRootDescriptorTable(2, gpuHandle);
+    m_commandList->SetGraphicsRootDescriptorTable(3, gpuHandle);
+}
+
+void EfgContext::BindConstantBuffer(const EfgBuffer& buffer)
+{
+    EfgBufferInternal* bufferInternal = reinterpret_cast<EfgBufferInternal*>(buffer.handle);
+    CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), bufferInternal->heapOffset, m_cbvSrvDescriptorSize);
+    m_commandList->SetGraphicsRootDescriptorTable(1, gpuHandle);
 }
 
 void EfgContext::CompileProgram(EfgProgram& program)
@@ -971,13 +978,14 @@ EfgImportMesh EfgContext::LoadFromObj(const char* basePath, const char* file)
 
     for (size_t m = 0; m < materials.size(); m++)
     {
-        EfgMaterial material;
+        EfgMaterialBuffer material;
+        EfgMaterialTextures textures;
         tinyobj::material_t importMat = materials[m];
-        material.ambient= XMFLOAT4(importMat.ambient[0], importMat.ambient[1], importMat.ambient[2], importMat.ambient[3]);
-        material.diffuse = XMFLOAT4(importMat.diffuse[0], importMat.diffuse[1], importMat.diffuse[2], importMat.diffuse[3]);
-        material.specular = XMFLOAT4(importMat.specular[0],importMat.specular[1], importMat.specular[2], importMat.specular[3]);
-        material.emission = XMFLOAT4(importMat.emission[0], importMat.emission[1], importMat.emission[2], importMat.emission[3]);
-        material.transmittance = XMFLOAT4(importMat.transmittance[0], importMat.transmittance[1], importMat.transmittance[2], importMat.transmittance[3]);
+        material.ambient= XMFLOAT4(importMat.ambient[0], importMat.ambient[1], importMat.ambient[2], 0.0f);
+        material.diffuse = XMFLOAT4(importMat.diffuse[0], importMat.diffuse[1], importMat.diffuse[2], 0.0f);
+        material.specular = XMFLOAT4(importMat.specular[0],importMat.specular[1], importMat.specular[2], 0.0f);
+        material.emission = XMFLOAT4(importMat.emission[0], importMat.emission[1], importMat.emission[2], 0.0f);
+        material.transmittance = XMFLOAT4(importMat.transmittance[0], importMat.transmittance[1], importMat.transmittance[2], 0.0f);
         material.shininess = importMat.shininess;
         material.roughness = importMat.roughness;
         material.metallic = importMat.metallic;
@@ -987,12 +995,15 @@ EfgImportMesh EfgContext::LoadFromObj(const char* basePath, const char* file)
         material.clearcoat_roughness = importMat.clearcoat_roughness;
         if (!materials[m].diffuse_texname.empty())
         {
+            material.diffuseMapFlag = 1;
             std::string texPath = std::string(basePath) + "\\" + materials[m].diffuse_texname;
             std::wstring w_texPath(texPath.begin(), texPath.end());
-            material.diffuse_map = CreateTexture2D(w_texPath.c_str());
+            textures.diffuse_map = CreateTexture2D(w_texPath.c_str());
         }
 
-        mesh.uploadMaterials.push_back(material);
+        EfgBuffer materialBuffer = CreateConstantBuffer<EfgMaterialBuffer>(&material, 1);
+        mesh.materialBuffers.push_back(materialBuffer);
+        mesh.textures.push_back(textures);
     }
 
     // Loop over shapes
@@ -1031,9 +1042,6 @@ EfgImportMesh EfgContext::LoadFromObj(const char* basePath, const char* file)
           mesh.materialBatches[shapes[s].mesh.material_ids[f]].indices.push_back(mesh.materialBatches[shapes[s].mesh.material_ids[f]].indices.size());
         }
         index_offset += fv;
-    
-        // per-face material
-        //shapes[s].mesh.material_ids[f];
       }
 
       for (size_t m = 0; m < mesh.materialBatches.size(); m++)

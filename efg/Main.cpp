@@ -47,7 +47,6 @@ int main()
     efg.initialize(efgWindow);
     Camera camera = efgCreateCamera(efg, DirectX::XMFLOAT3(-18.0f, -14.0f, 6.7f), DirectX::XMFLOAT3(0.0f, -13.0f, 0.0f));
 
-    EfgImportMesh mesh = efg.LoadFromObj("C:\\Users\\Ethan\\Documents\\sibenik", "C:\\Users\\Ethan\\Documents\\sibenik\\sibenik.obj");
     //EfgImportMesh mesh = efg.LoadFromObj("C:\\Users\\Ethan\\Documents\\rungholt", "C:\\Users\\Ethan\\Documents\\rungholt\\rungholt.obj");
 
     Shape square = Shapes::getShape(Shapes::SPHERE);
@@ -113,6 +112,8 @@ int main()
 
     EfgSampler sampler = efg.CreateSampler();
 
+    EfgImportMesh mesh = efg.LoadFromObj("C:\\Users\\Ethan\\Documents\\sibenik", "C:\\Users\\Ethan\\Documents\\sibenik\\sibenik.obj");
+
     efg.CommitShaderResources();
 
     EfgDescriptorRange range = EfgDescriptorRange(efgRange_CBV, 0);
@@ -121,6 +122,8 @@ int main()
     range.insert(viewPosBuffer);
     range.insert(materialBuffer);
     range.insert(lightDataBuffer);
+
+    EfgDescriptorRange materialRange = EfgDescriptorRange(efgRange_CBV, 5, 1);
 
     EfgDescriptorRange rangeSrv = EfgDescriptorRange(efgRange_SRV, 0);
     rangeSrv.insert(lightBuffer);
@@ -133,6 +136,9 @@ int main()
 
     EfgRootParameter rootParameter0;
     rootParameter0.insert(range);
+    EfgRootParameter rootParameter1;
+    rootParameter1.insert(materialRange);
+    rootParameter1.data.conditionalBind = true;
     EfgRootParameter rootParameter2;
     rootParameter2.insert(rangeSrv);
     EfgRootParameter rootParameter3;
@@ -144,6 +150,7 @@ int main()
 
     EfgRootSignature rootSignature;
     rootSignature.insert(rootParameter0);
+    rootSignature.insert(rootParameter1);
     rootSignature.insert(rootParameter2);
     rootSignature.insert(rootParameter3);
     rootSignature.insert(rootParameter4);
@@ -169,8 +176,9 @@ int main()
         for (size_t m = 0; m < mesh.materialBatches.size(); m++)
         {
             EfgInstanceBatch instances = mesh.materialBatches[m];
-            if(mesh.uploadMaterials[m].diffuse_map.handle > 0)
-                efg.Bind2DTexture(mesh.uploadMaterials[m].diffuse_map);
+            if(mesh.textures[m].diffuse_map.handle > 0)
+                efg.Bind2DTexture(mesh.textures[m].diffuse_map);
+            efg.BindConstantBuffer(mesh.materialBuffers[m]);
             efg.BindVertexBuffer(instances.vertexBuffer);
             efg.BindIndexBuffer(instances.indexBuffer);
             efg.DrawIndexedInstanced(instances.indexCount);

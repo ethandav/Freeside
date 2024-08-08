@@ -59,6 +59,29 @@ cbuffer LightConstants : register(b4)
     uint lightCount;
 }
 
+struct EfgMaterialBuffer
+{
+    float4 ambient;
+    float4 diffuse;
+    float4 specular;
+    float4 transmittance;
+    float4 emission;
+    float shininess;
+    float roughness;
+    float metallic;
+    float ior;
+    float dissolve;
+    float clearcoat;
+    float clearcoat_roughness;
+    int diffuseMapFlag;
+    float padding[3];
+};
+
+cbuffer MatBuffer : register(b5)
+{
+    EfgMaterialBuffer mat;
+}
+
 struct VSInput
 {
     float4 position : POSITION;
@@ -90,31 +113,39 @@ PSInput VSMain(VSInput input, uint InstanceID : SV_InstanceID)
 
 float3 calculatePointLight(LightData light, float3 normal, float3 fragPos, float3 viewDir, float2 uv)
 { 
-    // Diffuse
-    float3 texDiffuse = diffuseMap.Sample(textureSampler, uv).xyz;
-    //float3 texDiffuse = float3(0.2f, 0.2f, 0.2f);
-    //float3 texDiffuse = material.diffuse;
     float3 lightDir = normalize(light.position.xyz - fragPos);
+
+    // Diffuse shading
     float diff = max(dot(normal, lightDir), 0.0);
 
-    // Specular
+    // Specular shading
     float3 reflectDir = reflect(-lightDir, normal);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), mat.shininess);
 
     // Attenuation
     float distance = length(light.position.xyz - fragPos);
     float attenuation = 1.0 / (light.attenuation.x + light.attenuation.y * distance + light.attenuation.z * (distance * distance));
 
-    // Material
-    float3 ambient = (light.ambient * light.color).xyz * texDiffuse;
-    float3 diffuse = (light.diffuse.xyz * light.color.xyz) * (diff * texDiffuse);
-    float3 specular = light.specular.xyz * (spec * material.specular.xyz);
+    float3 texDiffuse, ambient, diffuse, specular;
+
+    if(mat.diffuseMapFlag > 0)
+    {
+        texDiffuse = diffuseMap.Sample(textureSampler, uv).xyz;
+    }
+    else
+    {
+        texDiffuse = mat.diffuse.xyz;
+    }
+
+    ambient = (light.ambient * light.color).xyz * texDiffuse;
+    diffuse = (light.diffuse.xyz * light.color.xyz) * diff * texDiffuse;
+    specular = light.specular.xyz * spec * mat.specular.xyz;
 
     ambient *= attenuation;
     diffuse *= attenuation;
     specular *= attenuation;
 
-    return (ambient + diffuse + specular);
+    return ambient + diffuse + specular;
 }
 
 float4 PSMain(PSInput input) : SV_TARGET

@@ -45,7 +45,7 @@ int main()
     EfgWindow efgWindow = efgCreateWindow(1920, 1080, L"New Window");
     EfgContext efg;
     efg.initialize(efgWindow);
-    Camera camera = efgCreateCamera(efg, DirectX::XMFLOAT3(0.0f, 0.0f, -5.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f));
+    Camera camera = efgCreateCamera(efg, DirectX::XMFLOAT3(-18.0f, -14.0f, 6.7f), DirectX::XMFLOAT3(0.0f, -13.0f, 0.0f));
 
     EfgImportMesh mesh = efg.LoadFromObj("C:\\Users\\Ethan\\Documents\\sibenik", "C:\\Users\\Ethan\\Documents\\sibenik\\sibenik.obj");
     //EfgImportMesh mesh = efg.LoadFromObj("C:\\Users\\Ethan\\Documents\\rungholt", "C:\\Users\\Ethan\\Documents\\rungholt\\rungholt.obj");

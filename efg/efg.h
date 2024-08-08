@@ -143,9 +143,30 @@ struct EfgProgram
 
 struct EfgMaterial
 {
-    uint32_t index = 0;
-    std::string diffuse_texname;
-    EfgTexture diffuseTexture = {};
+    XMFLOAT4 ambient = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+    XMFLOAT4 diffuse = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+    XMFLOAT4 specular = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+    XMFLOAT4 transmittance = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+    XMFLOAT4 emission = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+    float shininess = 0.0f;
+    float roughness = 1.0f;
+    float metallic = 0.0f;
+    float ior = 1.5f;
+    float dissolve = 1.5f;
+    float clearcoat = 0.0f;
+    float clearcoat_roughness = 0.0f;
+
+    EfgTexture diffuse_map;
+    EfgTexture roughness_map;
+    EfgTexture metallicity_map;
+    EfgTexture emissivity_map;
+    EfgTexture specular_map;
+    EfgTexture normal_map;
+    EfgTexture transmission_map;
+    EfgTexture sheen_map;
+    EfgTexture clearcoat_map;
+    EfgTexture clearcoat_roughness_map;
+    EfgTexture ao_map;
 };
 
 struct EfgInstanceBatch
@@ -156,6 +177,12 @@ struct EfgInstanceBatch
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
     std::vector<EfgMaterial> materials;
+};
+
+struct EfgImportMesh
+{
+    std::vector<EfgMaterial> uploadMaterials;
+    std::unordered_map<int, EfgInstanceBatch> materialBatches;
 };
 
 class EfgDescriptorRange
@@ -247,7 +274,7 @@ public:
     void SetPipelineState(EfgPSO pso);
     void DrawInstanced(uint32_t vertexCount);
     void DrawIndexedInstanced(uint32_t indexCount, uint32_t instanceCount = 1);
-    std::vector<EfgInstanceBatch> LoadFromObj(const char* basePath, const char* file);
+    EfgImportMesh LoadFromObj(const char* basePath, const char* file);
     void Frame();
     void Render();
     void Destroy();
@@ -279,8 +306,6 @@ public:
         size_t stride = sizeof(TYPE);
         return CreateStructuredBuffer(data, count * sizeof(TYPE), count, stride);
     }
-
-    std::vector<EfgMaterial> uploadMaterials;
 
 private:
     void GetHardwareAdapter(

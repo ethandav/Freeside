@@ -47,7 +47,8 @@ int main()
     efg.initialize(efgWindow);
     Camera camera = efgCreateCamera(efg, DirectX::XMFLOAT3(0.0f, 0.0f, -5.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f));
 
-    std::vector<EfgInstanceBatch> batch = efg.LoadFromObj("C:\\Users\\Ethan\\Documents\\sibenik", "C:\\Users\\Ethan\\Documents\\sibenik\\sibenik.obj");
+    EfgImportMesh mesh = efg.LoadFromObj("C:\\Users\\Ethan\\Documents\\sibenik", "C:\\Users\\Ethan\\Documents\\sibenik\\sibenik.obj");
+    //EfgImportMesh mesh = efg.LoadFromObj("C:\\Users\\Ethan\\Documents\\rungholt", "C:\\Users\\Ethan\\Documents\\rungholt\\rungholt.obj");
 
     Shape square = Shapes::getShape(Shapes::SPHERE);
 	//std::mt19937 rng(std::random_device{}());
@@ -160,22 +161,20 @@ int main()
         efg.BindRootDescriptorTable(rootSignature);
         efg.UpdateConstantBuffer(viewProjBuffer, &camera.viewProj, sizeof(camera.viewProj));
         efg.UpdateConstantBuffer(viewPosBuffer, &camera.eye, sizeof(camera.eye));
-        efg.BindVertexBuffer(vertexBuffer);
-        efg.BindIndexBuffer(indexBuffer);
-        efg.Bind2DTexture(texture);
-        efg.DrawIndexedInstanced(square.indexCount, 2000);
+        //efg.BindVertexBuffer(vertexBuffer);
+        //efg.BindIndexBuffer(indexBuffer);
+        //efg.Bind2DTexture(texture);
+        //efg.DrawIndexedInstanced(square.indexCount, 2000);
 
-        //for (auto& instances : batch)
-        //{
-        //    for (auto& material : instances.materials)
-        //    {
-        //        if(!material.diffuse_texname.empty())
-        //            efg.Bind2DTexture(material.diffuseTexture);
-        //    }
-        //    efg.BindVertexBuffer(instances.vertexBuffer);
-        //    efg.BindIndexBuffer(instances.indexBuffer);
-        //    efg.DrawIndexedInstanced(instances.indexCount);
-        //}
+        for (size_t m = 0; m < mesh.materialBatches.size(); m++)
+        {
+            EfgInstanceBatch instances = mesh.materialBatches[m];
+            if(mesh.uploadMaterials[m].diffuse_map.handle > 0)
+                efg.Bind2DTexture(mesh.uploadMaterials[m].diffuse_map);
+            efg.BindVertexBuffer(instances.vertexBuffer);
+            efg.BindIndexBuffer(instances.indexBuffer);
+            efg.DrawIndexedInstanced(instances.indexCount);
+        }
 
         efg.Render();
     }

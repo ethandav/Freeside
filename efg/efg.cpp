@@ -943,15 +943,14 @@ void EfgContext::BindRootDescriptorTable(EfgRootSignature& rootSignature)
     }
 }
 
-std::vector<EfgInstanceBatch> EfgContext::LoadFromObj(const char* basePath, const char* file)
+EfgImportMesh EfgContext::LoadFromObj(const char* basePath, const char* file)
 {
-    std::vector<EfgInstanceBatch> uploadBatch;
-    std::vector<EfgMaterial> uploadMaterials;
+    EfgImportMesh mesh;
     tinyobj::ObjReaderConfig readerConfig;
     readerConfig.mtl_search_path = basePath;
 
     tinyobj::ObjReader reader;
-/*
+
     if (!reader.ParseFromFile(file, readerConfig))
     {
         if (!reader.Error().empty())
@@ -972,23 +971,32 @@ std::vector<EfgInstanceBatch> EfgContext::LoadFromObj(const char* basePath, cons
 
     for (size_t m = 0; m < materials.size(); m++)
     {
-        EfgMaterial mat;
-
-        mat.index = m;
+        EfgMaterial material;
+        tinyobj::material_t importMat = materials[m];
+        material.ambient= XMFLOAT4(importMat.ambient[0], importMat.ambient[1], importMat.ambient[2], importMat.ambient[3]);
+        material.diffuse = XMFLOAT4(importMat.diffuse[0], importMat.diffuse[1], importMat.diffuse[2], importMat.diffuse[3]);
+        material.specular = XMFLOAT4(importMat.specular[0],importMat.specular[1], importMat.specular[2], importMat.specular[3]);
+        material.emission = XMFLOAT4(importMat.emission[0], importMat.emission[1], importMat.emission[2], importMat.emission[3]);
+        material.transmittance = XMFLOAT4(importMat.transmittance[0], importMat.transmittance[1], importMat.transmittance[2], importMat.transmittance[3]);
+        material.shininess = importMat.shininess;
+        material.roughness = importMat.roughness;
+        material.metallic = importMat.metallic;
+        material.ior = importMat.ior;
+        material.dissolve = importMat.dissolve;
+        material.clearcoat = importMat.clearcoat_thickness;
+        material.clearcoat_roughness = importMat.clearcoat_roughness;
         if (!materials[m].diffuse_texname.empty())
         {
             std::string texPath = std::string(basePath) + "\\" + materials[m].diffuse_texname;
             std::wstring w_texPath(texPath.begin(), texPath.end());
-            mat.diffuse_texname = materials[m].diffuse_texname;
-            CreateTexture2D(mat.diffuseTexture, w_texPath.c_str());
+            material.diffuse_map = CreateTexture2D(w_texPath.c_str());
         }
 
-        uploadMaterials.push_back(mat);
+        mesh.uploadMaterials.push_back(material);
     }
 
     // Loop over shapes
     for (size_t s = 0; s < shapes.size(); s++) {
-      EfgInstanceBatch batch;
       // Loop over faces(polygon)
       size_t index_offset = 0;
       for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
@@ -1019,23 +1027,22 @@ std::vector<EfgInstanceBatch> EfgContext::LoadFromObj(const char* basePath, cons
           // tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
           // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
           // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
-          batch.vertices.push_back(vertex);
-          batch.indices.push_back(batch.indices.size());
+          mesh.materialBatches[shapes[s].mesh.material_ids[f]].vertices.push_back(vertex);
+          mesh.materialBatches[shapes[s].mesh.material_ids[f]].indices.push_back(mesh.materialBatches[shapes[s].mesh.material_ids[f]].indices.size());
         }
         index_offset += fv;
     
         // per-face material
         //shapes[s].mesh.material_ids[f];
       }
-      batch.vertexBuffer = CreateVertexBuffer<Vertex>(batch.vertices.data(), batch.vertices.size());
-      batch.indexBuffer = CreateIndexBuffer<uint32_t>(batch.indices.data(), batch.indices.size());
-      batch.indexCount = batch.indices.size();
 
-      for (auto& mat_id : shapes[s].mesh.material_ids)
-          batch.materials.push_back(uploadMaterials[mat_id]);
-
-      uploadBatch.push_back(batch);
+      for (size_t m = 0; m < mesh.materialBatches.size(); m++)
+      {
+        mesh.materialBatches[m].vertexBuffer = CreateVertexBuffer<Vertex>(mesh.materialBatches[m].vertices.data(), mesh.materialBatches[m].vertices.size());
+        mesh.materialBatches[m].indexBuffer = CreateIndexBuffer<uint32_t>(mesh.materialBatches[m].indices.data(), mesh.materialBatches[m].indices.size());
+        mesh.materialBatches[m].indexCount = mesh.materialBatches[m].indices.size();
+      }
     }
-*/
-    return uploadBatch;
+
+    return mesh;
 }

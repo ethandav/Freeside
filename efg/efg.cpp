@@ -259,14 +259,6 @@ void EfgContext::Frame()
     // re-recording.
     EFG_D3D_TRY(m_commandList->Reset(m_commandAllocator.Get(), m_boundPSO.pipelineState.Get()));
 
-    // Set necessary state.
-    //m_commandList->SetGraphicsRootSignature(m_boundPSO.rootSignature.Get());
-    m_commandList->SetGraphicsRootSignature(m_boundPSO.rootSignature.Get());
-    m_commandList->RSSetViewports(1, &m_viewport);
-    m_commandList->RSSetScissorRects(1, &m_scissorRect);
-
-    m_commandList->SetPipelineState(m_boundPSO.pipelineState.Get());
-
     // Indicate that the back buffer will be used as a render target.
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
@@ -925,6 +917,11 @@ EfgPSO EfgContext::CreateGraphicsPipelineState(EfgProgram program, EfgRootSignat
 
 void EfgContext::SetPipelineState(EfgPSO pso)
 {
+    // Set necessary state.
+    m_commandList->SetGraphicsRootSignature(pso.rootSignature.Get());
+    m_commandList->RSSetViewports(1, &m_viewport);
+    m_commandList->RSSetScissorRects(1, &m_scissorRect);
+    m_commandList->SetPipelineState(pso.pipelineState.Get());
     m_boundPSO = pso;
 }
 

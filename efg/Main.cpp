@@ -164,13 +164,13 @@ int main()
 
     EfgProgram program = efg.CreateProgram(L"shaders.hlsl");
     EfgPSO pso = efg.CreateGraphicsPipelineState(program, rootSignature);
-    efg.SetPipelineState(pso);
 
     while (efgWindowIsRunning(efgWindow))
     {
         efgWindowPumpEvents(efgWindow);
         efgUpdateCamera(efg, efgWindow, camera);
         efg.Frame();
+        efg.SetPipelineState(pso);
         efg.BindRootDescriptorTable(rootSignature);
         efg.UpdateConstantBuffer(viewProjBuffer, &camera.viewProj, sizeof(camera.viewProj));
         efg.UpdateConstantBuffer(viewPosBuffer, &camera.eye, sizeof(camera.eye));

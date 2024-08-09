@@ -109,6 +109,10 @@ int main()
 
     EfgImportMesh mesh = efg.LoadFromObj("C:\\Users\\Ethan\\Documents\\sibenik", "C:\\Users\\Ethan\\Documents\\sibenik\\sibenik.obj");
 
+    // Create a Skybox
+    Shape skybox = Shapes::getShape(Shapes::SKYBOX);
+    EfgVertexBuffer skyboxVertexBuffer = efg.CreateVertexBuffer<Vertex>(skybox.vertices.data(), skybox.vertexCount);
+    EfgIndexBuffer skyboxIndexBuffer = efg.CreateIndexBuffer<uint32_t>(skybox.indices.data(), skybox.indexCount);
     std::wstring rightFace = L"C:\\Users\\Ethan\\Documents\\FreesideEngineTestAssets\\skybox\\right.png";
     std::wstring leftFace = L"C:\\Users\\Ethan\\Documents\\FreesideEngineTestAssets\\skybox\\left.png";
     std::wstring topFace = L"C:\\Users\\Ethan\\Documents\\FreesideEngineTestAssets\\skybox\\top.png";
@@ -119,8 +123,39 @@ int main()
         rightFace, leftFace, topFace, bottomFace, frontFace, backFace
     };
     EfgTexture skyBox = efg.CreateTextureCube(skyboxTextures);
+    XMFLOAT4X4 skybox_view = camera.view;
+    skybox_view._41 = 0.0f;
+    skybox_view._42 = 0.0f;
+    skybox_view._43 = 0.0f;
+    skybox_view._44 = 1.0f;
+    EfgBuffer skybox_viewBuffer = efg.CreateConstantBuffer<XMFLOAT4X4>(&skybox_view, 1);
+    EfgBuffer skybox_projBuffer = efg.CreateConstantBuffer<XMFLOAT4X4>(&camera.proj, 1);
 
+    // Must commit all resources before creating root signatures. This will pack all resources in the heap by type.
     efg.CommitShaderResources();
+
+    // Skybox Root Signature
+    EfgDescriptorRange skybox_range_CBV = EfgDescriptorRange(efgRange_CBV, 0);
+    skybox_range_CBV.insert(skybox_viewBuffer);
+    skybox_range_CBV.insert(skybox_projBuffer);
+    EfgDescriptorRange skybox_range_cube = EfgDescriptorRange(efgRange_SRV, 0);
+    skybox_range_cube.insert(skyBox);
+    EfgDescriptorRange skybox_rangeSampler = EfgDescriptorRange(efgRange_SAMPLER, 0);
+    skybox_rangeSampler.insert(sampler);
+    EfgRootParameter skybox_rootParameter_1;
+    EfgRootParameter skybox_rootParameter_2;
+    EfgRootParameter skybox_rootParameter_3;
+    skybox_rootParameter_1.insert(skybox_range_CBV);
+    skybox_rootParameter_2.insert(skybox_range_cube);
+    skybox_rootParameter_3.insert(skybox_rangeSampler);
+    EfgRootSignature skybox_rootSignature;
+    skybox_rootSignature.insert(skybox_rootParameter_1);
+    skybox_rootSignature.insert(skybox_rootParameter_2);
+    skybox_rootSignature.insert(skybox_rootParameter_3);
+    efg.CreateRootSignature(skybox_rootSignature);
+    EfgProgram skyboxProgram = efg.CreateProgram(L"skybox.hlsl");
+    EfgPSO skyboxPso = efg.CreateGraphicsPipelineState(skyboxProgram, skybox_rootSignature);
+
 
     EfgDescriptorRange range = EfgDescriptorRange(efgRange_CBV, 0);
     range.insert(viewProjBuffer);
@@ -174,6 +209,13 @@ int main()
         efg.BindRootDescriptorTable(rootSignature);
         efg.UpdateConstantBuffer(viewProjBuffer, &camera.viewProj, sizeof(camera.viewProj));
         efg.UpdateConstantBuffer(viewPosBuffer, &camera.eye, sizeof(camera.eye));
+        XMFLOAT4X4 skybox_view = camera.view;
+        skybox_view._41 = 0.0f;
+        skybox_view._42 = 0.0f;
+        skybox_view._43 = 0.0f;
+        skybox_view._44 = 1.0f;
+        efg.UpdateConstantBuffer(skybox_viewBuffer, &skybox_view, sizeof(skybox_view));
+        efg.UpdateConstantBuffer(skybox_projBuffer, &camera.proj, sizeof(camera.proj));
         //efg.BindVertexBuffer(vertexBuffer);
         //efg.BindIndexBuffer(indexBuffer);
         //efg.Bind2DTexture(texture);
@@ -189,6 +231,12 @@ int main()
             efg.BindIndexBuffer(instances.indexBuffer);
             efg.DrawIndexedInstanced(instances.indexCount);
         }
+
+        efg.SetPipelineState(skyboxPso);
+        efg.BindRootDescriptorTable(skybox_rootSignature);
+        efg.BindVertexBuffer(skyboxVertexBuffer);
+        efg.BindIndexBuffer(skyboxIndexBuffer);
+        efg.DrawIndexedInstanced(skybox.indexCount);
 
         efg.Render();
     }

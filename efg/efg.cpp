@@ -386,6 +386,22 @@ void EfgContext::CreateTextureView(EfgTextureInternal* texture, uint32_t heapOff
     m_device->CreateShaderResourceView(texture->resource.Get(), &srvDesc, texture->srvHandle);
 }
 
+void EfgContext::CreateTextureCubeView(EfgTextureInternal* texture, uint32_t heapOffset)
+{
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Format = texture->resource.Get()->GetDesc().Format;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+    srvDesc.TextureCube.MostDetailedMip = 0;
+    srvDesc.TextureCube.MipLevels = 1;
+    srvDesc.TextureCube.ResourceMinLODClamp = 0.0f;
+    texture->heapOffset = heapOffset;
+    texture->srvHandle = m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart();
+    texture->srvHandle.Offset(heapOffset, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
+    
+    m_device->CreateShaderResourceView(texture->resource.Get(), &srvDesc, texture->srvHandle);
+}
+
 void EfgContext::CommitSampler(EfgSamplerInternal* sampler, uint32_t heapOffset)
 {
     CD3DX12_CPU_DESCRIPTOR_HANDLE samplerHandle(m_samplerHeap->GetCPUDescriptorHandleForHeapStart());
@@ -396,7 +412,7 @@ void EfgContext::CommitSampler(EfgSamplerInternal* sampler, uint32_t heapOffset)
 
 EfgResult EfgContext::CommitShaderResources()
 {
-    CreateCbvSrvDescriptorHeap(m_cbvDescriptorCount + m_srvDescriptorCount + m_textureCount);
+    CreateCbvSrvDescriptorHeap(m_cbvDescriptorCount + m_srvDescriptorCount + m_textureCount +m_textureCubeCount);
     CreateSamplerDescriptorHeap(m_samplerCount);
 
     uint32_t heapOffset = 0;
@@ -412,6 +428,11 @@ EfgResult EfgContext::CommitShaderResources()
 
     for (EfgTextureInternal* texture : m_textures) {
         CreateTextureView(texture, heapOffset);
+        heapOffset++;
+    }
+
+    for (EfgTextureInternal* texture : m_textureCubes) {
+        CreateTextureCubeView(texture, heapOffset);
         heapOffset++;
     }
 
@@ -697,6 +718,98 @@ EfgTexture EfgContext::CreateTexture2D(const wchar_t* filename)
     return texture;
 }
 
+EfgTexture EfgContext::CreateTextureCube(const std::vector<std::wstring>& filenames)
+{
+    // Ensure there are six filenames provided
+    if (filenames.size() != 6) throw std::runtime_error("Six filenames required for a texture cube");
+
+    EfgTexture texture = {};
+    EfgTextureInternal* textureInternal = new EfgTextureInternal();
+    texture.handle = reinterpret_cast<uint64_t>(textureInternal);
+    ComPtr<ID3D12Resource> textureResources[6];
+
+    // Describe the cube texture
+    D3D12_RESOURCE_DESC textureDesc = {};
+    textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    textureDesc.Width = 1024; // Example width, should match your texture's dimensions
+    textureDesc.Height = 1024; // Example height, should match your texture's dimensions
+    textureDesc.DepthOrArraySize = 6; // 6 faces for the cube map
+    textureDesc.MipLevels = 1;
+    textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    textureDesc.SampleDesc.Count = 1;
+    textureDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    // Create the cube texture resource
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+    EFG_D3D_TRY(m_device->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &textureDesc,
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        nullptr,
+        IID_PPV_ARGS(&textureInternal->resource)));
+
+    ResourceUploadBatch resourceUpload(m_device.Get());
+    resourceUpload.Begin();
+
+    for (int i = 0; i < 6; ++i) {
+        CreateWICTextureFromFileEx(
+            m_device.Get(),
+            resourceUpload,
+            filenames[i].c_str(),
+            0,
+            D3D12_RESOURCE_FLAG_NONE,
+            WIC_LOADER_FORCE_RGBA32,
+            textureResources[i].ReleaseAndGetAddressOf()
+        );
+    }
+
+    auto uploadResourcesFinished = resourceUpload.End(m_commandQueue.Get());
+    uploadResourcesFinished.wait();
+
+    ResetCommandList();
+
+    for (int i = 0; i < 6; ++i) {
+        // Transition the resource state to COPY_SOURCE
+        CD3DX12_RESOURCE_BARRIER transitionBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
+            textureResources[i].Get(),
+            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+            D3D12_RESOURCE_STATE_COPY_SOURCE
+        );
+        m_commandList->ResourceBarrier(1, &transitionBarrier);
+
+        D3D12_TEXTURE_COPY_LOCATION dst = {};
+        dst.pResource = textureInternal->resource.Get();
+        dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        dst.SubresourceIndex = D3D12CalcSubresource(0, i, 0, 1, 6);
+    
+        D3D12_TEXTURE_COPY_LOCATION src = {};
+        src.pResource = textureResources[i].Get();
+        src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        src.SubresourceIndex = 0;
+    
+        m_commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+    }
+    
+    CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+        textureInternal->resource.Get(),
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
+    );
+    m_commandList->ResourceBarrier(1, &barrier);
+
+    ExecuteCommandList();
+    WaitForGpu();
+
+    texture.index = m_textureCount;
+    m_textureCubes.push_back(textureInternal);
+    m_textureCubeCount++;
+    return texture;
+}
+
 EfgSampler EfgContext::CreateSampler()
 {
     EfgSampler sampler = {};
@@ -775,12 +888,26 @@ EfgPSO EfgContext::CreateGraphicsPipelineState(EfgProgram program, EfgRootSignat
 
     pso.rootSignature = rootSignature.Get();
 
+    // Define the rasterizer state description
+    D3D12_RASTERIZER_DESC rasterizerDesc = {};
+    rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID; // Fill solid polygons
+    rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;  // Cull back-facing polygons
+    rasterizerDesc.FrontCounterClockwise = FALSE;    // Counter-clockwise vertices define the front
+    rasterizerDesc.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
+    rasterizerDesc.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+    rasterizerDesc.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+    rasterizerDesc.DepthClipEnable = TRUE;           // Enable depth clipping
+    rasterizerDesc.MultisampleEnable = FALSE;        // Disable multisampling
+    rasterizerDesc.AntialiasedLineEnable = FALSE;    // Disable antialiased lines
+    rasterizerDesc.ForcedSampleCount = 0;
+    rasterizerDesc.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+
     // Describe and create the graphics pipeline state object (PSO).
     pso.desc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
     pso.desc.pRootSignature = rootSignature.Get().Get();
     pso.desc.VS = CD3DX12_SHADER_BYTECODE(program.vs.Get());
     pso.desc.PS = CD3DX12_SHADER_BYTECODE(program.ps.Get());
-    pso.desc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    pso.desc.RasterizerState = rasterizerDesc;
     pso.desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     pso.desc.DepthStencilState.DepthEnable = TRUE;
     pso.desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;

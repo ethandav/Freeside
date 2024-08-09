@@ -266,6 +266,7 @@ public:
     EfgBuffer CreateConstantBuffer(void const* data, UINT size);
     EfgBuffer CreateStructuredBuffer(void const* data, UINT size, uint32_t numElements, size_t stride);
     EfgTexture CreateTexture2D(const wchar_t* filename);
+    EfgTexture CreateTextureCube(const std::vector<std::wstring>& filenames);
     EfgSampler CreateSampler();
     void CreateRootSignature(EfgRootSignature& rootSignature);
     void UpdateConstantBuffer(EfgBuffer& buffer, void const* data, UINT size);
@@ -340,6 +341,7 @@ private:
     EfgResult CreateConstantBufferView(EfgConstantBuffer* buffer, uint32_t heapOffset);
     EfgResult CreateStructuredBufferView(EfgStructuredBuffer* buffer, uint32_t heapOffset);
     void CreateTextureView(EfgTextureInternal* texture, uint32_t heapOffset);
+    void CreateTextureCubeView(EfgTextureInternal* texture, uint32_t heapOffset);
     void CommitSampler(EfgSamplerInternal* sampler, uint32_t heapOffset);
 
 	HWND window_ = {};
@@ -371,10 +373,12 @@ private:
     uint32_t m_cbvDescriptorCount = 0;
     uint32_t m_srvDescriptorCount = 0;
     uint32_t m_textureCount = 0;
+    uint32_t m_textureCubeCount = 0;
     uint32_t m_samplerCount = 0;
     std::list<EfgConstantBuffer*> m_constantBuffers = {};
     std::list<EfgStructuredBuffer*> m_structuredBuffers = {};
     std::list<EfgTextureInternal*> m_textures = {};
+    std::list<EfgTextureInternal*> m_textureCubes = {};
     std::list<EfgSamplerInternal*> m_samplers = {};
 
     EfgPSO m_boundPSO = {};

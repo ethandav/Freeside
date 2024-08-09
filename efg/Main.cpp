@@ -47,8 +47,6 @@ int main()
     efg.initialize(efgWindow);
     Camera camera = efgCreateCamera(efg, DirectX::XMFLOAT3(-18.0f, -14.0f, 6.7f), DirectX::XMFLOAT3(0.0f, -13.0f, 0.0f));
 
-    //EfgImportMesh mesh = efg.LoadFromObj("C:\\Users\\Ethan\\Documents\\rungholt", "C:\\Users\\Ethan\\Documents\\rungholt\\rungholt.obj");
-
     Shape square = Shapes::getShape(Shapes::SPHERE);
 	//std::mt19937 rng(std::random_device{}());
 	//std::uniform_real_distribution<float> dist(-50.0f, 50.0f);
@@ -110,6 +108,17 @@ int main()
     EfgSampler sampler = efg.CreateSampler();
 
     EfgImportMesh mesh = efg.LoadFromObj("C:\\Users\\Ethan\\Documents\\sibenik", "C:\\Users\\Ethan\\Documents\\sibenik\\sibenik.obj");
+
+    std::wstring rightFace = L"C:\\Users\\Ethan\\Documents\\FreesideEngineTestAssets\\skybox\\right.png";
+    std::wstring leftFace = L"C:\\Users\\Ethan\\Documents\\FreesideEngineTestAssets\\skybox\\left.png";
+    std::wstring topFace = L"C:\\Users\\Ethan\\Documents\\FreesideEngineTestAssets\\skybox\\top.png";
+    std::wstring bottomFace = L"C:\\Users\\Ethan\\Documents\\FreesideEngineTestAssets\\skybox\\bottom.png";
+    std::wstring frontFace = L"C:\\Users\\Ethan\\Documents\\FreesideEngineTestAssets\\skybox\\front.png";
+    std::wstring backFace = L"C:\\Users\\Ethan\\Documents\\FreesideEngineTestAssets\\skybox\\back.png";
+    std::vector<std::wstring> skyboxTextures = {
+        rightFace, leftFace, topFace, bottomFace, frontFace, backFace
+    };
+    EfgTexture skyBox = efg.CreateTextureCube(skyboxTextures);
 
     efg.CommitShaderResources();
 

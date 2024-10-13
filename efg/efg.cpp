@@ -1078,7 +1078,8 @@ EfgImportMesh EfgContext::LoadFromObj(const char* basePath, const char* file)
 {
     EfgImportMesh mesh;
     tinyobj::ObjReaderConfig readerConfig;
-    readerConfig.mtl_search_path = basePath;
+    if(basePath != nullptr)
+        readerConfig.mtl_search_path = basePath;
 
     tinyobj::ObjReader reader;
 
@@ -1120,7 +1121,11 @@ EfgImportMesh EfgContext::LoadFromObj(const char* basePath, const char* file)
         if (!materials[m].diffuse_texname.empty())
         {
             material.diffuseMapFlag = 1;
-            std::string texPath = std::string(basePath) + "\\" + materials[m].diffuse_texname;
+            std::string texPath;
+            if (basePath != nullptr)
+                texPath = std::string(basePath) + "\\" + materials[m].diffuse_texname;
+            else
+                texPath = materials[m].diffuse_texname;
             std::wstring w_texPath(texPath.begin(), texPath.end());
             textures.diffuse_map = CreateTexture2D(w_texPath.c_str());
         }
@@ -1170,9 +1175,12 @@ EfgImportMesh EfgContext::LoadFromObj(const char* basePath, const char* file)
 
       for (size_t m = 0; m < mesh.materialBatches.size(); m++)
       {
-        mesh.materialBatches[m].vertexBuffer = CreateVertexBuffer<Vertex>(mesh.materialBatches[m].vertices.data(), mesh.materialBatches[m].vertices.size());
-        mesh.materialBatches[m].indexBuffer = CreateIndexBuffer<uint32_t>(mesh.materialBatches[m].indices.data(), mesh.materialBatches[m].indices.size());
-        mesh.materialBatches[m].indexCount = mesh.materialBatches[m].indices.size();
+        if (mesh.materialBatches[m].vertices.size() > 0)
+        {
+            mesh.materialBatches[m].vertexBuffer = CreateVertexBuffer<Vertex>(mesh.materialBatches[m].vertices.data(), mesh.materialBatches[m].vertices.size());
+            mesh.materialBatches[m].indexBuffer = CreateIndexBuffer<uint32_t>(mesh.materialBatches[m].indices.data(), mesh.materialBatches[m].indices.size());
+            mesh.materialBatches[m].indexCount = mesh.materialBatches[m].indices.size();
+        }
       }
     }
 

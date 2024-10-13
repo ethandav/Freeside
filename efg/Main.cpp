@@ -48,17 +48,17 @@ int main()
     Camera camera = efgCreateCamera(efg, DirectX::XMFLOAT3(-18.0f, -14.0f, 6.7f), DirectX::XMFLOAT3(0.0f, -13.0f, 0.0f));
 
     Shape square = Shapes::getShape(Shapes::SPHERE);
-	//std::mt19937 rng(std::random_device{}());
-	//std::uniform_real_distribution<float> dist(-50.0f, 50.0f);
+	std::mt19937 rng(std::random_device{}());
+	std::uniform_real_distribution<float> dist(-50.0f, 50.0f);
     std::vector<XMMATRIX> transformMatrices;
-	//transformMatrices.reserve(2000);
-	//for (int i = 0; i < 2000; i++)
-	//{
-	//	transformMatrices.push_back(efgCreateTransformMatrix(XMFLOAT3(dist(rng), dist(rng), dist(rng)), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f)));
-	//}
+	transformMatrices.reserve(2000);
+	for (int i = 0; i < 2000; i++)
+	{
+		transformMatrices.push_back(efgCreateTransformMatrix(XMFLOAT3(dist(rng), dist(rng), dist(rng)), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f)));
+	}
     XMMATRIX transformMatrix = efgCreateTransformMatrix(XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f));
     transformMatrices.push_back(transformMatrix);
-    //XMMATRIX transformMatrix2 = efgCreateTransformMatrix(XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f));
+    XMMATRIX transformMatrix2 = efgCreateTransformMatrix(XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f));
 
     struct LightBuffer
     {
@@ -70,7 +70,8 @@ int main()
         XMFLOAT4 attenuation = XMFLOAT4(1.0f, 0.009f, 0.0032f, 0.0f);
     };
     std::vector<LightBuffer> lights(1);
-    lights[0].position = XMFLOAT4(30.0f, 10.0f, 0.0f, 0.0f);
+    //lights[0].position = XMFLOAT4(30.0f, 10.0f, 0.0f, 0.0f);
+    lights[0].position = XMFLOAT4(5.0f, 20.0f, 0.0f, 0.0f);
     lights[0].color = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.0f);
 
     struct LightConstants
@@ -108,6 +109,7 @@ int main()
     EfgSampler sampler = efg.CreateSampler();
 
     EfgImportMesh mesh = efg.LoadFromObj("C:\\Users\\Ethan\\Documents\\sibenik", "C:\\Users\\Ethan\\Documents\\sibenik\\sibenik.obj");
+    //EfgImportMesh mesh = efg.LoadFromObj(nullptr, "C:\\Users\\Ethan\\Documents\\FreesideEngineTestAssets\\donut\\donut.obj");
 
     // Create a Skybox
     Shape skybox = Shapes::getShape(Shapes::SKYBOX);
@@ -216,10 +218,10 @@ int main()
         skybox_view._44 = 1.0f;
         efg.UpdateConstantBuffer(skybox_viewBuffer, &skybox_view, sizeof(skybox_view));
         efg.UpdateConstantBuffer(skybox_projBuffer, &camera.proj, sizeof(camera.proj));
-        //efg.BindVertexBuffer(vertexBuffer);
-        //efg.BindIndexBuffer(indexBuffer);
-        //efg.Bind2DTexture(texture);
-        //efg.DrawIndexedInstanced(square.indexCount, 2000);
+        efg.BindVertexBuffer(vertexBuffer);
+        efg.BindIndexBuffer(indexBuffer);
+        efg.Bind2DTexture(texture);
+        efg.DrawIndexedInstanced(square.indexCount, 2000);
 
         for (size_t m = 0; m < mesh.materialBatches.size(); m++)
         {

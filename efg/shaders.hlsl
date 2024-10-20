@@ -19,23 +19,14 @@ cbuffer TransformBuffer : register(b1)
     matrix transform;
 }
 
-cbuffer ViewBuffer : register(b2)
+cbuffer ObjectConstants : register(b2)
 {
-    float3 viewPos;
+    bool isInstanced;
 }
 
-struct Material
+cbuffer ViewBuffer : register(b3)
 {
-    float4 ambient;
-    float4 diffuse;
-    float4 specular;
-    float shininess;
-    float3 padding;
-};
-
-cbuffer MaterialBuffer : register(b3)
-{
-    Material material;
+    float3 viewPos;
 }
 
 struct LightData
@@ -100,7 +91,11 @@ struct PSInput
 PSInput VSMain(VSInput input, uint InstanceID : SV_InstanceID)
 {
     PSInput result;
-    float4 worldPos = mul(instances[InstanceID], input.position);
+    float4 worldPos;
+    if(isInstanced)
+        worldPos = mul(instances[InstanceID], input.position);
+    else
+        worldPos = mul(transform, input.position);
     float4 clipPos = mul(viewProjectionMatrix, worldPos);
 
     result.position = clipPos;

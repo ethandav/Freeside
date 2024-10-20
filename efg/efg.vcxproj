@@ -133,6 +133,7 @@
   <ItemGroup>
     <ClInclude Include="DXHelper.h" />
     <ClInclude Include="efg.h" />
+    <ClInclude Include="efg_resources.h" />
     <ClInclude Include="efg_camera.h" />
     <ClInclude Include="efg_exception.h" />
     <ClInclude Include="efg_window.h" />
@@ -143,6 +144,8 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="efg_camera.cpp" />
+    <ClCompile Include="efg_gameObject.cpp" />
+    <ClInclude Include="efg_gameObject.h" />
     <ClCompile Include="efg_window.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>

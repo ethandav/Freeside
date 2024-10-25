@@ -43,6 +43,15 @@ enum EFG_RANGE_TYPE
     efgRange_SAMPLER
 };
 
+enum EFG_ROOT_PARAMETER_TYPE
+{
+    efgRootParamter_DESCRIPTOR_TABLE,
+    efgRootParameter_CONSTANT,
+    efgRootParamter_CBV,
+    efgRootParamter_SRV,
+    efgRootParamter_UAV
+};
+
 
 struct EfgPSO
 {
@@ -75,6 +84,14 @@ struct EfgImportMesh
     std::unordered_map<int, EfgInstanceBatch> materialBatches;
 };
 
+struct ShaderRegisters
+{
+    uint32_t CBV = 0;
+    uint32_t SRV = 0;
+    uint32_t UAV = 0;
+    uint32_t SAMPLER = 0;
+};
+
 class EfgDescriptorRange
 {
 public:
@@ -102,6 +119,30 @@ private:
 class EfgRootParameter
 {
 public:
+    EfgRootParameter(EFG_ROOT_PARAMETER_TYPE efgType)
+    {
+        switch (efgType)
+        {
+        case 0:
+            type = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+            data.conditionalBind = false;
+            break;
+        case 1:
+            type = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+            break;
+        case 2:
+            type = D3D12_ROOT_PARAMETER_TYPE_CBV;
+            break;
+        case 3:
+            type = D3D12_ROOT_PARAMETER_TYPE_SRV;
+            break;
+        case 4:
+            type = D3D12_ROOT_PARAMETER_TYPE_UAV;
+            break;
+        default:
+            throw("Root paramter must have a type");
+        }
+    };
     void insert(EfgDescriptorRange& range) {
         bool useOffset = !ranges.empty();
         if (useOffset && range.offset < data.offset) {
@@ -112,15 +153,16 @@ public:
         ranges.push_back(range.Commit(useOffset));
         data.size += range.numDescriptors;
     };
-    D3D12_ROOT_PARAMETER Commit();
+    D3D12_ROOT_PARAMETER Commit(ShaderRegisters& registerIndex);
 
     struct Data {
         uint32_t size = 0;
         UINT offset = 0;
-        bool conditionalBind = false;
-        std::vector<EfgDescriptorRange*> rangeData;
+        bool conditionalBind = true;
     };
 
+    D3D12_ROOT_PARAMETER_TYPE type;
+    uint32_t registerIndex = 0;
     Data data;
 
 private:
@@ -130,7 +172,10 @@ private:
 class EfgRootSignature
 {
 public:
-    void insert(EfgRootParameter& parameter) { rootParameters.push_back(parameter.Commit()); parameterData.push_back(parameter.data); };
+    void insert(EfgRootParameter& parameter) {
+        rootParameters.push_back(parameter.Commit(registers));
+        parameterData.push_back(parameter.data);
+    };
     ComPtr<ID3DBlob> Serialize();
     ComPtr<ID3D12RootSignature>& Get() { return rootSignature; }
     std::vector<EfgRootParameter::Data> parameterData = {};
@@ -138,7 +183,7 @@ public:
 private:
     D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
     ComPtr<ID3D12RootSignature> rootSignature;
-
+    ShaderRegisters registers = {};
 };
 
 class EfgContext

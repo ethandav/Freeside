@@ -946,8 +946,7 @@ void EfgContext::Bind2DTexture(const EfgTexture& texture)
 void EfgContext::BindConstantBuffer(uint32_t index, const EfgBuffer& buffer)
 {
     EfgBufferInternal* bufferInternal = reinterpret_cast<EfgBufferInternal*>(buffer.handle);
-    CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), bufferInternal->heapOffset, m_cbvSrvDescriptorSize);
-    m_commandList->SetGraphicsRootDescriptorTable(index, gpuHandle);
+    m_commandList->SetGraphicsRootConstantBufferView(index, bufferInternal->m_bufferResource.Get()->GetGPUVirtualAddress());
 }
 
 void EfgContext::CompileProgram(EfgProgram& program)
@@ -1007,13 +1006,55 @@ D3D12_DESCRIPTOR_RANGE EfgDescriptorRange::Commit(bool useOffset = false)
     return descriptorRange;
 }
 
-D3D12_ROOT_PARAMETER EfgRootParameter::Commit()
+D3D12_ROOT_PARAMETER EfgRootParameter::Commit(ShaderRegisters& registers)
 {
     D3D12_ROOT_PARAMETER rootParameter = {};
-    rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    rootParameter.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(ranges.size());
-    rootParameter.DescriptorTable.pDescriptorRanges = ranges.data();
+    rootParameter.ParameterType = type;
     rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    switch (type)
+    {
+    case D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE:
+        rootParameter.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(ranges.size());
+        rootParameter.DescriptorTable.pDescriptorRanges = ranges.data();
+        for (size_t i = 0; i < ranges.size(); ++i)
+        {
+            switch (ranges[i].RangeType)
+            {
+            case D3D12_DESCRIPTOR_RANGE_TYPE_CBV:
+                ranges[i].BaseShaderRegister = registers.CBV;
+                registers.CBV += ranges.data()->NumDescriptors;
+                break;
+            case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
+                ranges[i].BaseShaderRegister = registers.SRV;
+                registers.SRV+= ranges.data()->NumDescriptors;
+                break;
+            case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
+                ranges[i].BaseShaderRegister = registers.UAV;
+                registers.UAV += ranges.data()->NumDescriptors;
+                break;
+            case D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER:
+                ranges[i].BaseShaderRegister = registers.SAMPLER;
+                registers.SAMPLER += ranges.data()->NumDescriptors;
+                break;
+            }
+        }
+        break;
+    case D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS:
+        break;
+    case D3D12_ROOT_PARAMETER_TYPE_CBV:
+        rootParameter.Descriptor.ShaderRegister = registers.CBV;
+        registers.CBV++;
+        break;
+    case D3D12_ROOT_PARAMETER_TYPE_SRV:
+        rootParameter.Descriptor.ShaderRegister = registers.SRV;
+        registers.SRV++;
+        break;
+    case D3D12_ROOT_PARAMETER_TYPE_UAV:
+        rootParameter.Descriptor.ShaderRegister = registers.UAV;
+        registers.UAV++;
+        break;
+    }
     return rootParameter;
 }
 

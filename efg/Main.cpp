@@ -177,9 +177,9 @@ int main()
     skybox_range_cube.insert(skyBox);
     EfgDescriptorRange skybox_rangeSampler = EfgDescriptorRange(efgRange_SAMPLER, 0);
     skybox_rangeSampler.insert(sampler);
-    EfgRootParameter skybox_rootParameter_1;
-    EfgRootParameter skybox_rootParameter_2;
-    EfgRootParameter skybox_rootParameter_3;
+    EfgRootParameter skybox_rootParameter_1(efgRootParamter_DESCRIPTOR_TABLE);
+    EfgRootParameter skybox_rootParameter_2(efgRootParamter_DESCRIPTOR_TABLE);
+    EfgRootParameter skybox_rootParameter_3(efgRootParamter_DESCRIPTOR_TABLE);
     skybox_rootParameter_1.insert(skybox_range_CBV);
     skybox_rootParameter_2.insert(skybox_range_cube);
     skybox_rootParameter_3.insert(skybox_rangeSampler);
@@ -197,10 +197,6 @@ int main()
     range.insert(viewPosBuffer);
     range.insert(lightDataBuffer);
 
-    EfgDescriptorRange transformRange = EfgDescriptorRange(efgRange_CBV, 3, 1);
-    EfgDescriptorRange objectConstantRange = EfgDescriptorRange(efgRange_CBV, 4, 1);
-    EfgDescriptorRange materialRange = EfgDescriptorRange(efgRange_CBV, 5, 1);
-
     EfgDescriptorRange rangeSrv = EfgDescriptorRange(efgRange_SRV, 0);
     rangeSrv.insert(lightBuffer);
     rangeSrv.insert(transformMatrixBuffer);
@@ -210,24 +206,17 @@ int main()
     EfgDescriptorRange rangeSampler = EfgDescriptorRange(efgRange_SAMPLER, 0);
     rangeSampler.insert(sampler);
 
-    EfgRootParameter rootParameter0;
+    EfgRootParameter rootParameter0(efgRootParamter_DESCRIPTOR_TABLE);
     rootParameter0.insert(range);
-    EfgRootParameter rootParameter1;
-    rootParameter1.insert(transformRange);
-    rootParameter1.data.conditionalBind = true;
-    EfgRootParameter rootParameter2;
-    rootParameter2.insert(objectConstantRange);
-    rootParameter2.data.conditionalBind = true;
-    EfgRootParameter rootParameter3;
-    rootParameter3.insert(materialRange);
-    rootParameter3.data.conditionalBind = true;
-    EfgRootParameter rootParameter4;
+    EfgRootParameter rootParameter1(efgRootParamter_CBV); // Transform
+    EfgRootParameter rootParameter2(efgRootParamter_CBV); // Object constants
+    EfgRootParameter rootParameter3(efgRootParamter_CBV); // Material
+    EfgRootParameter rootParameter4(efgRootParamter_DESCRIPTOR_TABLE);
     rootParameter4.insert(rangeSrv);
-    EfgRootParameter rootParameter5;
+    EfgRootParameter rootParameter5(efgRootParamter_DESCRIPTOR_TABLE); // Texture
     rootParameter5.insert(rangeTex);
-    rootParameter5.data.conditionalBind = true;
 
-    EfgRootParameter rootParameter6;
+    EfgRootParameter rootParameter6(efgRootParamter_DESCRIPTOR_TABLE);
     rootParameter6.insert(rangeSampler);
 
     EfgRootSignature rootSignature;

@@ -940,14 +940,14 @@ void EfgContext::Bind2DTexture(const EfgTexture& texture)
     m_boundTexture = &texture;
     EfgTextureInternal* textureInternal = reinterpret_cast<EfgTextureInternal*>(texture.handle);
     CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), textureInternal->heapOffset, m_cbvSrvDescriptorSize);
-    m_commandList->SetGraphicsRootDescriptorTable(3, gpuHandle);
+    m_commandList->SetGraphicsRootDescriptorTable(5, gpuHandle);
 }
 
-void EfgContext::BindConstantBuffer(const EfgBuffer& buffer)
+void EfgContext::BindConstantBuffer(uint32_t index, const EfgBuffer& buffer)
 {
     EfgBufferInternal* bufferInternal = reinterpret_cast<EfgBufferInternal*>(buffer.handle);
     CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), bufferInternal->heapOffset, m_cbvSrvDescriptorSize);
-    m_commandList->SetGraphicsRootDescriptorTable(1, gpuHandle);
+    m_commandList->SetGraphicsRootDescriptorTable(index, gpuHandle);
 }
 
 void EfgContext::CompileProgram(EfgProgram& program)

@@ -82,13 +82,14 @@ int main()
 	std::uniform_real_distribution<float> dist(-50.0f, 50.0f);
     std::vector<XMMATRIX> transformMatrices;
 	transformMatrices.reserve(2000);
-	//for (int i = 0; i < 2000; i++)
-	//{
-	//	transformMatrices.push_back(efgCreateTransformMatrix(XMFLOAT3(dist(rng), dist(rng), dist(rng)), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f)));
-	//}
-    XMMATRIX transformMatrix = efgCreateTransformMatrix(XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f));
-    transformMatrices.push_back(transformMatrix);
-    //XMMATRIX transformMatrix2 = efgCreateTransformMatrix(XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f));
+	for (int i = 0; i < 2000; i++)
+	{
+		transformMatrices.push_back(efgCreateTransformMatrix(XMFLOAT3(dist(rng), dist(rng), dist(rng)), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f)));
+	}
+    InstanceableObject sphereInstanced;
+    sphereInstanced.vertexBuffer = efg.CreateVertexBuffer<Vertex>(square.vertices.data(), square.vertexCount);
+    sphereInstanced.indexBuffer = efg.CreateIndexBuffer<uint32_t>(square.indices.data(), square.indexCount);
+    sphereInstanced.constantsBuffer = efg.CreateConstantBuffer<ObjectConstants>(&sphereInstanced.constants, 1);
 
     GameObject sphere;
     sphere.vertexBuffer = efg.CreateVertexBuffer<Vertex>(square.vertices.data(), square.vertexCount);
@@ -103,6 +104,8 @@ int main()
     sphere.transform.translation = XMFLOAT3(1.0f, 1.0f, 1.0f);
     sphere.transform.scale = XMFLOAT3(1.0f, 1.0f, 1.0f);
     sphere.transform.rotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    sphere.constantsBuffer = efg.CreateConstantBuffer<ObjectConstants>(&sphere.constants, 1);
+    sphere.transformBuffer = efg.CreateConstantBuffer<XMMATRIX>(&sphere.transform.GetTransformMatrix(), 1);
 
     struct LightBuffer
     {
@@ -127,8 +130,6 @@ int main()
 
 
     EfgBuffer viewProjBuffer = efg.CreateConstantBuffer<XMMATRIX>(&camera.viewProj, 1);
-    EfgBuffer transformBuffer = efg.CreateConstantBuffer<XMMATRIX>(&XMMatrixIdentity(), 1);
-    EfgBuffer constantsBuffer = efg.CreateConstantBuffer<ObjectConstants>(&ObjectConstants(), 1);
     EfgBuffer viewPosBuffer = efg.CreateConstantBuffer<XMFLOAT3>(&camera.eye, 1);
     EfgBuffer lightDataBuffer = efg.CreateConstantBuffer<LightBuffer>(&lightData, 1);
 
@@ -193,11 +194,11 @@ int main()
 
     EfgDescriptorRange range = EfgDescriptorRange(efgRange_CBV, 0);
     range.insert(viewProjBuffer);
-    range.insert(transformBuffer);
-    range.insert(constantsBuffer);
     range.insert(viewPosBuffer);
     range.insert(lightDataBuffer);
 
+    EfgDescriptorRange transformRange = EfgDescriptorRange(efgRange_CBV, 3, 1);
+    EfgDescriptorRange objectConstantRange = EfgDescriptorRange(efgRange_CBV, 4, 1);
     EfgDescriptorRange materialRange = EfgDescriptorRange(efgRange_CBV, 5, 1);
 
     EfgDescriptorRange rangeSrv = EfgDescriptorRange(efgRange_SRV, 0);
@@ -212,16 +213,22 @@ int main()
     EfgRootParameter rootParameter0;
     rootParameter0.insert(range);
     EfgRootParameter rootParameter1;
-    rootParameter1.insert(materialRange);
+    rootParameter1.insert(transformRange);
     rootParameter1.data.conditionalBind = true;
     EfgRootParameter rootParameter2;
-    rootParameter2.insert(rangeSrv);
+    rootParameter2.insert(objectConstantRange);
+    rootParameter2.data.conditionalBind = true;
     EfgRootParameter rootParameter3;
-    rootParameter3.insert(rangeTex);
+    rootParameter3.insert(materialRange);
     rootParameter3.data.conditionalBind = true;
-
     EfgRootParameter rootParameter4;
-    rootParameter4.insert(rangeSampler);
+    rootParameter4.insert(rangeSrv);
+    EfgRootParameter rootParameter5;
+    rootParameter5.insert(rangeTex);
+    rootParameter5.data.conditionalBind = true;
+
+    EfgRootParameter rootParameter6;
+    rootParameter6.insert(rangeSampler);
 
     EfgRootSignature rootSignature;
     rootSignature.insert(rootParameter0);
@@ -229,6 +236,8 @@ int main()
     rootSignature.insert(rootParameter2);
     rootSignature.insert(rootParameter3);
     rootSignature.insert(rootParameter4);
+    rootSignature.insert(rootParameter5);
+    rootSignature.insert(rootParameter6);
     efg.CreateRootSignature(rootSignature);
 
     EfgProgram program = efg.CreateProgram(L"shaders.hlsl");
@@ -262,10 +271,13 @@ int main()
         efg.BindVertexBuffer(sphere.vertexBuffer);
         efg.BindIndexBuffer(sphere.indexBuffer);
         efg.Bind2DTexture(texture);
-        efg.BindConstantBuffer(materialBuffer);
-        efg.UpdateConstantBuffer(transformBuffer, &(sphere.transform.GetTransformMatrix()), sizeof(XMMATRIX));
-        efg.UpdateConstantBuffer(transformBuffer, &(sphere.transform.GetTransformMatrix()), sizeof(XMMATRIX));
+        efg.BindConstantBuffer(1, sphere.transformBuffer);
+        efg.BindConstantBuffer(2, sphere.constantsBuffer);
+        efg.BindConstantBuffer(3, materialBuffer);
         efg.DrawIndexedInstanced(square.indexCount, 1);
+
+        efg.BindConstantBuffer(2, sphereInstanced.constantsBuffer);
+        efg.DrawIndexedInstanced(square.indexCount, 2000);
 
         //for (size_t m = 0; m < mesh.materialBatches.size(); m++)
         //{

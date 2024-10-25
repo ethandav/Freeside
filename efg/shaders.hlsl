@@ -14,19 +14,24 @@ cbuffer ViewProjectionBuffer : register(b0)
     matrix viewProjectionMatrix;
 }
 
-cbuffer TransformBuffer : register(b1)
+cbuffer ViewBuffer : register(b1)
+{
+    float3 viewPos;
+}
+
+cbuffer LightConstants : register(b2)
+{
+    uint lightCount;
+}
+
+cbuffer TransformBuffer : register(b3)
 {
     matrix transform;
 }
 
-cbuffer ObjectConstants : register(b2)
+cbuffer ObjectConstants : register(b4)
 {
     bool isInstanced;
-}
-
-cbuffer ViewBuffer : register(b3)
-{
-    float3 viewPos;
 }
 
 struct LightData
@@ -44,11 +49,6 @@ StructuredBuffer<matrix> instances : register(t1);
 
 Texture2D diffuseMap: register(t2);
 SamplerState textureSampler : register(s0);
-
-cbuffer LightConstants : register(b4)
-{
-    uint lightCount;
-}
 
 struct EfgMaterialBuffer
 {

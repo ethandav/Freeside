@@ -6,7 +6,7 @@ using namespace DirectX;
 
 struct ObjectConstants
 {
-	bool isInstanced;
+	bool isInstanced = false;
 };
 
 class Transform
@@ -31,10 +31,13 @@ public:
 	EfgMaterialBuffer material;
 	EfgVertexBuffer vertexBuffer;
 	EfgIndexBuffer indexBuffer;
+	EfgBuffer transformBuffer;
+	EfgBuffer constantsBuffer;
 };
 
 class InstanceableObject : public GameObject
 {
+public:
 	InstanceableObject() { constants.isInstanced = true; }
 	virtual void Render() override;
 	void AddInstance(Transform instanceTransform);

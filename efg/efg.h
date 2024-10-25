@@ -158,7 +158,7 @@ public:
     void BindVertexBuffer(EfgVertexBuffer buffer);
     void BindIndexBuffer(EfgIndexBuffer buffer);
     void Bind2DTexture(const EfgTexture& texture);
-    void BindConstantBuffer(const EfgBuffer& texture);
+    void BindConstantBuffer(uint32_t index, const EfgBuffer& buffer);
     void BindRootDescriptorTable(EfgRootSignature& rootSignature);
     EfgResult CommitShaderResources();
     EfgProgram CreateProgram(LPCWSTR fileName);

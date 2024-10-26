@@ -200,6 +200,7 @@ public:
     EfgSampler CreateSampler();
     void CreateRootSignature(EfgRootSignature& rootSignature);
     void UpdateConstantBuffer(EfgBuffer& buffer, void const* data, UINT size);
+    void UpdateStructuredBuffer(EfgBuffer& buffer, void const* data, UINT size);
     void BindVertexBuffer(EfgVertexBuffer buffer);
     void BindIndexBuffer(EfgIndexBuffer buffer);
     void Bind2DTexture(const EfgTexture& texture);

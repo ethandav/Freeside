@@ -838,6 +838,18 @@ void EfgContext::UpdateConstantBuffer(EfgBuffer& buffer, void const* data, UINT 
     bufferInternal->m_bufferResource->Unmap(0, &writeRange);
 }
 
+void EfgContext::UpdateStructuredBuffer(EfgBuffer& buffer, void const* data, UINT size)
+{
+    EfgStructuredBuffer* bufferInternal = reinterpret_cast<EfgStructuredBuffer*>(buffer.handle);
+    void* mappedData = nullptr;
+    D3D12_RANGE readRange = { 0, 0 };
+    D3D12_RANGE writeRange = { 0, size };
+    bufferInternal->m_bufferResource->Map(0, &readRange, &mappedData);
+    if (mappedData)
+        memcpy(mappedData, data, (size_t)size);
+    bufferInternal->m_bufferResource->Unmap(0, &writeRange);
+}
+
 void EfgContext::WaitForGpu()
 {
     m_fenceValue++;

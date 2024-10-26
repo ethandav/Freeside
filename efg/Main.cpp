@@ -141,7 +141,7 @@ int main()
 
     EfgSampler sampler = efg.CreateSampler();
 
-    //EfgImportMesh mesh = efg.LoadFromObj("C:\\Users\\Ethan\\Documents\\sibenik", "C:\\Users\\Ethan\\Documents\\sibenik\\sibenik.obj");
+    EfgImportMesh mesh = efg.LoadFromObj("C:\\Users\\Ethan\\Documents\\sibenik", "C:\\Users\\Ethan\\Documents\\sibenik\\sibenik.obj");
     //EfgImportMesh mesh = efg.LoadFromObj(nullptr, "C:\\Users\\Ethan\\Documents\\FreesideEngineTestAssets\\donut\\donut.obj");
 
     // Create a Skybox
@@ -265,19 +265,21 @@ int main()
         efg.BindConstantBuffer(3, materialBuffer);
         efg.DrawIndexedInstanced(square.indexCount, 1);
 
+        efg.Bind2DTexture(texture2);
         efg.BindConstantBuffer(2, sphereInstanced.constantsBuffer);
         efg.DrawIndexedInstanced(square.indexCount, 2000);
 
-        //for (size_t m = 0; m < mesh.materialBatches.size(); m++)
-        //{
-        //    EfgInstanceBatch instances = mesh.materialBatches[m];
-        //    if(mesh.textures[m].diffuse_map.handle > 0)
-        //        efg.Bind2DTexture(mesh.textures[m].diffuse_map);
-        //    efg.BindConstantBuffer(mesh.materialBuffers[m]);
-        //    efg.BindVertexBuffer(instances.vertexBuffer);
-        //    efg.BindIndexBuffer(instances.indexBuffer);
-        //    efg.DrawIndexedInstanced(instances.indexCount);
-        //}
+        for (size_t m = 0; m < mesh.materialBatches.size(); m++)
+        {
+            EfgInstanceBatch instances = mesh.materialBatches[m];
+            if(mesh.textures[m].diffuse_map.handle > 0)
+                efg.Bind2DTexture(mesh.textures[m].diffuse_map);
+            efg.BindConstantBuffer(2, sphere.constantsBuffer);
+            efg.BindConstantBuffer(3, mesh.materialBuffers[m]);
+            efg.BindVertexBuffer(instances.vertexBuffer);
+            efg.BindIndexBuffer(instances.indexBuffer);
+            efg.DrawIndexedInstanced(instances.indexCount);
+        }
 
         efg.SetPipelineState(skyboxPso);
         efg.BindRootDescriptorTable(skybox_rootSignature);

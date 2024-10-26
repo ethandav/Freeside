@@ -21,7 +21,7 @@ cbuffer ViewBuffer : register(b1)
 
 cbuffer LightConstants : register(b2)
 {
-    uint lightCount;
+    uint numPointlights;
 }
 
 cbuffer TransformBuffer : register(b3)
@@ -33,22 +33,6 @@ cbuffer ObjectConstants : register(b4)
 {
     bool isInstanced;
 }
-
-struct LightData
-{
-    float4 color;
-    float4 position;
-    float4 ambient;
-    float4 diffuse;
-    float4 specular;
-    float4 attenuation;
-};
-StructuredBuffer<LightData> lights : register(t0);
-
-StructuredBuffer<matrix> instances : register(t1);
-
-Texture2D diffuseMap: register(t2);
-SamplerState textureSampler : register(s0);
 
 struct EfgMaterialBuffer
 {
@@ -72,6 +56,36 @@ cbuffer MatBuffer : register(b5)
 {
     EfgMaterialBuffer mat;
 }
+
+struct DirLightBuffer
+{
+    float4 color;
+    float4 direction;
+    float4 ambient;
+    float4 diffuse;
+    float4 specular;
+};
+cbuffer DirLight : register(b6)
+{
+    DirLightBuffer dirLight;
+}
+
+struct LightData
+{
+    float4 color;
+    float4 position;
+    float4 ambient;
+    float4 diffuse;
+    float4 specular;
+    float4 attenuation;
+};
+StructuredBuffer<LightData> lights : register(t0);
+
+StructuredBuffer<matrix> instances : register(t1);
+
+Texture2D diffuseMap: register(t2);
+SamplerState textureSampler : register(s0);
+
 
 struct VSInput
 {
@@ -104,6 +118,28 @@ PSInput VSMain(VSInput input, uint InstanceID : SV_InstanceID)
     result.uv = input.uv;
 
     return result;
+}
+
+float3 calculateDirLight(float3 normal, float3 viewDir, float2 uv)
+{
+    float3 lightDir = normalize(-dirLight.direction);
+    float diff = max(dot(normal, lightDir), 0.0);
+    float3 reflectDir = reflect(-lightDir, normal);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), mat.shininess);
+
+    float3 texDiffuse, ambient, diffuse, specular;
+
+    if(mat.diffuseMapFlag > 0)
+        texDiffuse = diffuseMap.Sample(textureSampler, uv).xyz;
+    else
+        texDiffuse = mat.diffuse.xyz;
+
+    ambient = (dirLight.ambient * dirLight.color).xyz * texDiffuse;
+    diffuse = (dirLight.diffuse.xyz * dirLight.color.xyz) * diff * texDiffuse;
+    specular = dirLight.specular.xyz * spec * mat.specular.xyz;
+
+    return ambient + diffuse + specular;
+
 }
 
 float3 calculatePointLight(LightData light, float3 normal, float3 fragPos, float3 viewDir, float2 uv)
@@ -148,9 +184,11 @@ float4 PSMain(PSInput input) : SV_TARGET
     float3 normal = normalize(input.normal);
     float3 viewDir = normalize(viewPos - input.fragPos);
     
-    float3 color;
+    float3 color = float3(0.0f, 0.0f, 0.0);
 
-    for (uint i = 0; i < lightCount; ++i)
+    color += calculateDirLight(normal, viewDir, input.uv);
+
+    for (uint i = 0; i < numPointlights; ++i)
     {
         color += calculatePointLight(lights[i], normal, input.fragPos, viewDir, input.uv);
     }

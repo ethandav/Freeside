@@ -125,3 +125,4 @@ struct EfgMaterialBuffer
     int diffuseMapFlag = 0;
     float padding[3] = { 0.0f, 0.0f, 0.0f };
 };
+

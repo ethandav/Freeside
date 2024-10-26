@@ -22,6 +22,7 @@
 #include "efg_window.h"
 #include "Shapes.h"
 #include "efg_resources.h"
+#include "efg_lighting.h"
 
 using namespace DirectX;
 using Microsoft::WRL::ComPtr;
@@ -47,7 +48,7 @@ enum EFG_ROOT_PARAMETER_TYPE
 {
     efgRootParamter_DESCRIPTOR_TABLE,
     efgRootParameter_CONSTANT,
-    efgRootParamter_CBV,
+    efgRootParameter_CBV,
     efgRootParamter_SRV,
     efgRootParamter_UAV
 };
@@ -203,7 +204,7 @@ public:
     void UpdateStructuredBuffer(EfgBuffer& buffer, void const* data, UINT size);
     void BindVertexBuffer(EfgVertexBuffer buffer);
     void BindIndexBuffer(EfgIndexBuffer buffer);
-    void Bind2DTexture(const EfgTexture& texture);
+    void Bind2DTexture(uint32_t index, const EfgTexture& texture);
     void BindConstantBuffer(uint32_t index, const EfgBuffer& buffer);
     void BindRootDescriptorTable(EfgRootSignature& rootSignature);
     EfgResult CommitShaderResources();

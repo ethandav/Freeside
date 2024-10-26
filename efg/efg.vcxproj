@@ -133,6 +133,7 @@
   <ItemGroup>
     <ClInclude Include="DXHelper.h" />
     <ClInclude Include="efg.h" />
+    <ClInclude Include="efg_lighting.h" />
     <ClInclude Include="efg_resources.h" />
     <ClInclude Include="efg_camera.h" />
     <ClInclude Include="efg_exception.h" />

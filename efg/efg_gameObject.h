@@ -6,7 +6,9 @@ using namespace DirectX;
 
 struct ObjectConstants
 {
-	bool isInstanced = false;
+	uint32_t isInstanced = false;
+	uint32_t useTransform = false;
+	float padding[2];
 };
 
 class Transform

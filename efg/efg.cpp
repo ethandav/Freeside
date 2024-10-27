@@ -189,6 +189,14 @@ void EfgContext::LoadPipeline()
     m_rtvHeap = CreateDescriptorHeap(FrameCount, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
     m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
+    D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
+    dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+    dsvHeapDesc.NumDescriptors = 2;
+    dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+    dsvHeapDesc.NodeMask = 0;
+
+    EFG_D3D_TRY(m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&dsvHeap)));
+
     CreateDepthBuffer();
 
     // Create frame resources.
@@ -205,6 +213,90 @@ void EfgContext::LoadPipeline()
     }
 
     EFG_D3D_TRY(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
+}
+
+void EfgContext::CreateDepthBuffer()
+{
+    D3D12_RESOURCE_DESC depthStencilDesc = {};
+    depthStencilDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    depthStencilDesc.Width = 1920;
+    depthStencilDesc.Height = 1080;
+    depthStencilDesc.DepthOrArraySize = 1;
+    depthStencilDesc.MipLevels = 1;
+    depthStencilDesc.Format = DXGI_FORMAT_D32_FLOAT;
+    depthStencilDesc.SampleDesc.Count = 1;
+    depthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+    
+    D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
+    depthOptimizedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
+    depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
+    depthOptimizedClearValue.DepthStencil.Stencil = 0;
+    
+    CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_DEFAULT);
+    
+    HRESULT hr = m_device->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &depthStencilDesc,
+        D3D12_RESOURCE_STATE_DEPTH_WRITE,
+        &depthOptimizedClearValue,
+        IID_PPV_ARGS(&depthStencilBuffer)
+    );
+
+    D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+    dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
+    dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+    dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+    
+    D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
+    m_device->CreateDepthStencilView(depthStencilBuffer.Get(), &dsvDesc, dsvHandle);
+}
+
+EfgTexture EfgContext::CreateShadowMap(uint32_t width, uint32_t height)
+{
+    EfgTexture texture = {};
+    EfgTextureInternal* textureInternal = new EfgTextureInternal();
+    texture.handle = reinterpret_cast<uint64_t>(textureInternal);
+
+    D3D12_RESOURCE_DESC shadowMapDesc = {};
+    shadowMapDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    shadowMapDesc.Width = width;
+    shadowMapDesc.Height = height;
+    shadowMapDesc.DepthOrArraySize = 1;
+    shadowMapDesc.MipLevels = 1;
+    shadowMapDesc.Format = DXGI_FORMAT_D32_FLOAT;
+    shadowMapDesc.SampleDesc.Count = 1;
+    shadowMapDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+    D3D12_CLEAR_VALUE clearValue = {};
+    clearValue.Format = DXGI_FORMAT_D32_FLOAT;
+    clearValue.DepthStencil.Depth = 1.0f;
+    clearValue.DepthStencil.Stencil = 0;
+    
+    CD3DX12_HEAP_PROPERTIES heapProperties(D3D12_HEAP_TYPE_DEFAULT);
+    m_device->CreateCommittedResource(
+        &heapProperties,
+        D3D12_HEAP_FLAG_NONE,
+        &shadowMapDesc,
+        D3D12_RESOURCE_STATE_DEPTH_WRITE,
+        &clearValue,
+        IID_PPV_ARGS(&textureInternal->resource)
+    );
+
+    D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+    dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
+    dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+    dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+    
+    m_device->CreateDepthStencilView(textureInternal->resource.Get(), &dsvDesc, dsvHeap->GetCPUDescriptorHandleForHeapStart());
+
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+        textureInternal->resource.Get(),
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        D3D12_RESOURCE_STATE_DEPTH_WRITE
+    ));
+
+    return texture;
 }
 
 ComPtr<ID3D12DescriptorHeap> EfgContext::CreateDescriptorHeap(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type)
@@ -583,50 +675,6 @@ void EfgContext::CopyBuffer(ComPtr<ID3D12Resource> dest, ComPtr<ID3D12Resource> 
     WaitForGpu();
 }
 
-void EfgContext::CreateDepthBuffer()
-{
-    D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
-    dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-    dsvHeapDesc.NumDescriptors = 1; // For one depth buffer
-    dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-    dsvHeapDesc.NodeMask = 0;
-
-    EFG_D3D_TRY(m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&dsvHeap)));
-
-    D3D12_RESOURCE_DESC depthStencilDesc = {};
-    depthStencilDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    depthStencilDesc.Width = 1920;
-    depthStencilDesc.Height = 1080;
-    depthStencilDesc.DepthOrArraySize = 1;
-    depthStencilDesc.MipLevels = 1;
-    depthStencilDesc.Format = DXGI_FORMAT_D32_FLOAT;
-    depthStencilDesc.SampleDesc.Count = 1;
-    depthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-    
-    D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
-    depthOptimizedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
-    depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
-    depthOptimizedClearValue.DepthStencil.Stencil = 0;
-    
-    CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_DEFAULT);
-    
-    HRESULT hr = m_device->CreateCommittedResource(
-        &heapProps,
-        D3D12_HEAP_FLAG_NONE,
-        &depthStencilDesc,
-        D3D12_RESOURCE_STATE_DEPTH_WRITE,
-        &depthOptimizedClearValue,
-        IID_PPV_ARGS(&depthStencilBuffer)
-    );
-
-    D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-    dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
-    dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-    dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
-    
-    D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
-    m_device->CreateDepthStencilView(depthStencilBuffer.Get(), &dsvDesc, dsvHandle);
-}
 
 EfgVertexBuffer EfgContext::CreateVertexBuffer(void const* data, UINT size)
 {
@@ -871,12 +919,12 @@ void EfgContext::ResetCommandList()
     EFG_D3D_TRY(m_commandList->Reset(m_commandAllocator.Get(), nullptr));
 }
 
-EfgProgram EfgContext::CreateProgram(LPCWSTR fileName)
+EfgShader EfgContext::CreateShader(LPCWSTR fileName, LPCSTR target, LPCSTR entryPoint)
 {
-    EfgProgram program = {};
-    program.source = GetAssetFullPath(fileName);
-    CompileProgram(program);
-    return program;
+    EfgShader shader = {};
+    shader.source = GetAssetFullPath(fileName);
+    CompileShader(shader, entryPoint, target);
+    return shader;
 }
 
 EfgPSO EfgContext::CreateGraphicsPipelineState(EfgProgram program, EfgRootSignature& rootSignature)
@@ -909,8 +957,8 @@ EfgPSO EfgContext::CreateGraphicsPipelineState(EfgProgram program, EfgRootSignat
     // Describe and create the graphics pipeline state object (PSO).
     pso.desc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
     pso.desc.pRootSignature = rootSignature.Get().Get();
-    pso.desc.VS = CD3DX12_SHADER_BYTECODE(program.vs.Get());
-    pso.desc.PS = CD3DX12_SHADER_BYTECODE(program.ps.Get());
+    pso.desc.VS = CD3DX12_SHADER_BYTECODE(program.vertexShader.byteCode.Get());
+    pso.desc.PS = CD3DX12_SHADER_BYTECODE(program.pixelShader.byteCode.Get());
     pso.desc.RasterizerState = rasterizerDesc;
     pso.desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     pso.desc.DepthStencilState.DepthEnable = TRUE;
@@ -923,6 +971,40 @@ EfgPSO EfgContext::CreateGraphicsPipelineState(EfgProgram program, EfgRootSignat
     pso.desc.NumRenderTargets = 1;
     pso.desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
     pso.desc.SampleDesc.Count = 1;
+    EFG_D3D_TRY(m_device->CreateGraphicsPipelineState(&pso.desc, IID_PPV_ARGS(&pso.pipelineState)));
+    return pso;
+}
+
+EfgPSO EfgContext::CreateShadowMapPSO(EfgProgram program, EfgRootSignature rootSignature)
+{
+    EfgPSO pso = {};
+    D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
+    {
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        //{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+    };
+    ZeroMemory(&pso.desc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
+    pso.desc.pRootSignature = rootSignature.Get().Get();
+    pso.desc.VS = CD3DX12_SHADER_BYTECODE(program.vertexShader.byteCode.Get());
+    pso.desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    pso.desc.SampleMask = UINT_MAX;
+    pso.desc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    pso.desc.RasterizerState.CullMode = D3D12_CULL_MODE_FRONT;
+    pso.desc.RasterizerState.DepthBias = 1000;
+    pso.desc.RasterizerState.DepthBiasClamp = 0.0f;
+    pso.desc.RasterizerState.SlopeScaledDepthBias = 1.0f;
+    pso.desc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    pso.desc.DepthStencilState.DepthEnable = TRUE;
+    pso.desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+    pso.desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+    pso.desc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+    pso.desc.NumRenderTargets = 0;
+    pso.desc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
+    pso.desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    pso.desc.SampleDesc.Count = 1;
+    pso.desc.SampleDesc.Quality = 0;
     EFG_D3D_TRY(m_device->CreateGraphicsPipelineState(&pso.desc, IID_PPV_ARGS(&pso.pipelineState)));
     return pso;
 }
@@ -961,7 +1043,7 @@ void EfgContext::BindConstantBuffer(uint32_t index, const EfgBuffer& buffer)
     m_commandList->SetGraphicsRootConstantBufferView(index, bufferInternal->m_bufferResource.Get()->GetGPUVirtualAddress());
 }
 
-void EfgContext::CompileProgram(EfgProgram& program)
+void EfgContext::CompileShader(EfgShader& shader, LPCSTR entryPoint, LPCSTR target)
 {
 #if defined(_DEBUG)
     UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
@@ -969,9 +1051,31 @@ void EfgContext::CompileProgram(EfgProgram& program)
     UINT compileFlags = 0;
 #endif
 
-    EFG_D3D_TRY(D3DCompileFromFile(program.source.c_str(), nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &program.vs, nullptr));
-    EFG_D3D_TRY(D3DCompileFromFile(program.source.c_str(), nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &program.ps, nullptr));
+    ComPtr<ID3DBlob> shaderBlob;
+    ComPtr<ID3DBlob> errorBlob;
+
+    HRESULT hr = D3DCompileFromFile(
+        shader.source.c_str(),
+        nullptr,           // Optional macros
+        nullptr,           // Optional include files
+        entryPoint,        // Entry point for shader
+        target,            // Shader model (vs_5_0, ps_5_0, etc.)
+        compileFlags,      // Compile options
+        0,                 // Effect compile options
+        &shaderBlob,       // Compiled shader
+        &errorBlob);       // Errors
+
+    if (FAILED(hr))
+    {
+        if (errorBlob) {
+            OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+        }
+        EFG_D3D_TRY(hr);
+    }
+    
+    shader.byteCode = shaderBlob;
 }
+
 
 void EfgContext::CheckD3DErrors()
 {
@@ -1153,6 +1257,10 @@ EfgImportMesh EfgContext::LoadFromObj(const char* basePath, const char* file)
     auto& attrib = reader.GetAttrib();
     auto shapes = reader.GetShapes();
     auto materials = reader.GetMaterials();
+
+    mesh.constants.isInstanced = false;
+    mesh.constants.useTransform = false;
+    mesh.constantsBuffer = CreateConstantBuffer<ObjectConstants>(&mesh.constants, 1);
 
     for (size_t m = 0; m < materials.size(); m++)
     {

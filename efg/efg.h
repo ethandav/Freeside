@@ -23,6 +23,7 @@
 #include "Shapes.h"
 #include "efg_resources.h"
 #include "efg_lighting.h"
+#include "efg_gameObject.h"
 
 using namespace DirectX;
 using Microsoft::WRL::ComPtr;
@@ -61,13 +62,17 @@ struct EfgPSO
     D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
 };
 
-struct EfgProgram
+struct EfgShader
 {
     std::wstring source;
-    ComPtr<ID3DBlob> vs;
-    ComPtr<ID3DBlob> ps;
+    ComPtr<ID3DBlob> byteCode;
 };
 
+struct EfgProgram
+{
+    EfgShader vertexShader;
+    EfgShader pixelShader;
+};
 
 struct EfgInstanceBatch
 {
@@ -83,6 +88,8 @@ struct EfgImportMesh
     std::vector<EfgBuffer> materialBuffers;
     std::vector<EfgMaterialTextures> textures;
     std::unordered_map<int, EfgInstanceBatch> materialBatches;
+    ObjectConstants constants;
+    EfgBuffer constantsBuffer;
 };
 
 struct ShaderRegisters
@@ -199,6 +206,7 @@ public:
     EfgTexture CreateTexture2D(const wchar_t* filename);
     EfgTexture CreateTextureCube(const std::vector<std::wstring>& filenames);
     EfgSampler CreateSampler();
+    EfgTexture CreateShadowMap(uint32_t width, uint32_t height);
     void CreateRootSignature(EfgRootSignature& rootSignature);
     void UpdateConstantBuffer(EfgBuffer& buffer, void const* data, UINT size);
     void UpdateStructuredBuffer(EfgBuffer& buffer, void const* data, UINT size);
@@ -208,8 +216,9 @@ public:
     void BindConstantBuffer(uint32_t index, const EfgBuffer& buffer);
     void BindRootDescriptorTable(EfgRootSignature& rootSignature);
     EfgResult CommitShaderResources();
-    EfgProgram CreateProgram(LPCWSTR fileName);
+    EfgShader CreateShader(LPCWSTR fileName, LPCSTR target, LPCSTR entryPoint = "Main");
     EfgPSO CreateGraphicsPipelineState(EfgProgram program, EfgRootSignature& rootSignature);
+    EfgPSO CreateShadowMapPSO(EfgProgram program, EfgRootSignature rootSignature);
     void SetPipelineState(EfgPSO pso);
     void DrawInstanced(uint32_t vertexCount);
     void DrawIndexedInstanced(uint32_t indexCount, uint32_t instanceCount = 1);
@@ -257,7 +266,7 @@ private:
     void LoadAssets();
     void WaitForPreviousFrame();
 
-    void CompileProgram(EfgProgram& program);
+    void CompileShader(EfgShader& shader, LPCSTR entryPoint, LPCSTR target);
     ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type);
 
     void ResetCommandList();

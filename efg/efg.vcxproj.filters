@@ -66,6 +66,7 @@
   <ItemGroup>
     <CustomBuild Include="shaders.hlsl" />
     <CustomBuild Include="skybox.hlsl" />
+    <CustomBuild Include="vertex.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

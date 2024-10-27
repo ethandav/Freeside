@@ -1,19 +1,3 @@
-//*********************************************************
-//
-// Copyright (c) Microsoft. All rights reserved.
-// This code is licensed under the MIT License (MIT).
-// THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
-// IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR
-// PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
-//
-//*********************************************************
-
-cbuffer ViewProjectionBuffer : register(b0)
-{
-    matrix viewProjectionMatrix;
-}
-
 cbuffer ViewBuffer : register(b1)
 {
     float3 viewPos;
@@ -22,16 +6,6 @@ cbuffer ViewBuffer : register(b1)
 cbuffer LightConstants : register(b2)
 {
     uint numPointlights;
-}
-
-cbuffer TransformBuffer : register(b3)
-{
-    matrix transform;
-}
-
-cbuffer ObjectConstants : register(b4)
-{
-    bool isInstanced;
 }
 
 struct EfgMaterialBuffer
@@ -81,18 +55,8 @@ struct LightData
 };
 StructuredBuffer<LightData> lights : register(t0);
 
-StructuredBuffer<matrix> instances : register(t1);
-
 Texture2D diffuseMap: register(t2);
 SamplerState textureSampler : register(s0);
-
-
-struct VSInput
-{
-    float4 position : POSITION;
-    float3 normal : NORMAL;
-    float2 uv : TEXCOORD;
-};
 
 struct PSInput
 {
@@ -101,24 +65,6 @@ struct PSInput
     float3 normal : NORMAL;
     float2 uv : TEXCOORD;
 };
-
-PSInput VSMain(VSInput input, uint InstanceID : SV_InstanceID)
-{
-    PSInput result;
-    float4 worldPos;
-    if(isInstanced)
-        worldPos = mul(instances[InstanceID], input.position);
-    else
-        worldPos = mul(transform, input.position);
-    float4 clipPos = mul(viewProjectionMatrix, worldPos);
-
-    result.position = clipPos;
-    result.fragPos = worldPos.xyz;
-    result.normal = mul(float4(input.normal, 0.0f), transform).xyz;
-    result.uv = input.uv;
-
-    return result;
-}
 
 float3 calculateDirLight(float3 normal, float3 viewDir, float2 uv)
 {
@@ -179,7 +125,7 @@ float3 calculatePointLight(LightData light, float3 normal, float3 fragPos, float
     return ambient + diffuse + specular;
 }
 
-float4 PSMain(PSInput input) : SV_TARGET
+float4 Main(PSInput input) : SV_TARGET
 {
     float3 normal = normalize(input.normal);
     float3 viewDir = normalize(viewPos - input.fragPos);

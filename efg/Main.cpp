@@ -75,7 +75,7 @@ int main()
     EfgWindow efgWindow = efgCreateWindow(1920, 1080, L"New Window");
     EfgContext efg;
     efg.initialize(efgWindow);
-    Camera camera = efgCreateCamera(efg, DirectX::XMFLOAT3(0.0f, 0.0f, 5.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f));
+    Camera camera = efgCreateCamera(efg, DirectX::XMFLOAT3(0.0f, 5.0f, 5.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f));
 
     Shape square = Shapes::getShape(Shapes::SPHERE);
 	std::mt19937 rng(std::random_device{}());
@@ -87,11 +87,13 @@ int main()
 		transformMatrices.push_back(efgCreateTransformMatrix(XMFLOAT3(dist(rng), dist(rng), dist(rng)), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(1.0f, 1.0f, 1.0f)));
 	}
     InstanceableObject sphereInstanced;
+    sphereInstanced.constants.useTransform = true;
     sphereInstanced.vertexBuffer = efg.CreateVertexBuffer<Vertex>(square.vertices.data(), square.vertexCount);
     sphereInstanced.indexBuffer = efg.CreateIndexBuffer<uint32_t>(square.indices.data(), square.indexCount);
     sphereInstanced.constantsBuffer = efg.CreateConstantBuffer<ObjectConstants>(&sphereInstanced.constants, 1);
 
     GameObject sphere;
+    sphere.constants.useTransform = true;
     sphere.vertexBuffer = efg.CreateVertexBuffer<Vertex>(square.vertices.data(), square.vertexCount);
     sphere.indexBuffer = efg.CreateIndexBuffer<uint32_t>(square.indices.data(), square.indexCount);
     sphere.material.ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 0.0f);
@@ -116,6 +118,27 @@ int main()
     dirLight.ambient = XMFLOAT4(0.05f, 0.05f, 0.05f, 0.0f);
     dirLight.diffuse = XMFLOAT4(0.4f, 0.4f, 0.4f, 0.0f);
     dirLight.specular = XMFLOAT4(0.5f, 0.5f, 0.5f, 0.0f);
+
+    XMFLOAT3 sceneCenter(0.0f, 0.0f, 0.0f); 
+    float distanceFromScene = 50.0f;
+    XMFLOAT3 lightPosition(
+        sceneCenter.x - dirLight.direction.x * distanceFromScene,
+        sceneCenter.y - dirLight.direction.y * distanceFromScene,
+        sceneCenter.z - dirLight.direction.z * distanceFromScene
+    );
+
+    XMVECTOR lightPosVec = XMVectorSet(lightPosition.x, lightPosition.y, lightPosition.z, 1.0f);
+    XMVECTOR lightTargetVec = XMVectorSet(sceneCenter.x, sceneCenter.y, sceneCenter.z, 1.0f);
+    XMVECTOR lightUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+    XMMATRIX lightViewMatrix = XMMatrixLookAtLH(lightPosVec, lightTargetVec, lightUp);
+    float orthoWidth = 20.0f;
+    float orthoHeight = 20.0f;
+    float nearZ = 0.1f;
+    float farZ = 100.0f;
+    XMMATRIX lightProjectionMatrix = XMMatrixOrthographicLH(orthoWidth, orthoHeight, nearZ, farZ);
+    XMMATRIX lightViewProjMatrix = lightViewMatrix * lightProjectionMatrix;
+    EfgBuffer dirLightViewProj = efg.CreateConstantBuffer<XMMATRIX>(&lightViewProjMatrix, 1);
+    EfgTexture shadowMap = efg.CreateShadowMap(1920, 1080);
 
     LightConstants lightData;
     lightData.numPointLights = (uint32_t)pointLights.size();
@@ -161,26 +184,26 @@ int main()
     efg.CommitShaderResources();
 
     // Skybox Root Signature
-    EfgDescriptorRange skybox_range_CBV = EfgDescriptorRange(efgRange_CBV, 0);
-    skybox_range_CBV.insert(skybox_viewBuffer);
-    skybox_range_CBV.insert(skybox_projBuffer);
-    EfgDescriptorRange skybox_range_cube = EfgDescriptorRange(efgRange_SRV, 0);
-    skybox_range_cube.insert(skyBox);
-    EfgDescriptorRange skybox_rangeSampler = EfgDescriptorRange(efgRange_SAMPLER, 0);
-    skybox_rangeSampler.insert(sampler);
-    EfgRootParameter skybox_rootParameter_1(efgRootParamter_DESCRIPTOR_TABLE);
-    EfgRootParameter skybox_rootParameter_2(efgRootParamter_DESCRIPTOR_TABLE);
-    EfgRootParameter skybox_rootParameter_3(efgRootParamter_DESCRIPTOR_TABLE);
-    skybox_rootParameter_1.insert(skybox_range_CBV);
-    skybox_rootParameter_2.insert(skybox_range_cube);
-    skybox_rootParameter_3.insert(skybox_rangeSampler);
-    EfgRootSignature skybox_rootSignature;
-    skybox_rootSignature.insert(skybox_rootParameter_1);
-    skybox_rootSignature.insert(skybox_rootParameter_2);
-    skybox_rootSignature.insert(skybox_rootParameter_3);
-    efg.CreateRootSignature(skybox_rootSignature);
-    EfgProgram skyboxProgram = efg.CreateProgram(L"skybox.hlsl");
-    EfgPSO skyboxPso = efg.CreateGraphicsPipelineState(skyboxProgram, skybox_rootSignature);
+    //EfgDescriptorRange skybox_range_CBV = EfgDescriptorRange(efgRange_CBV, 0);
+    //skybox_range_CBV.insert(skybox_viewBuffer);
+    //skybox_range_CBV.insert(skybox_projBuffer);
+    //EfgDescriptorRange skybox_range_cube = EfgDescriptorRange(efgRange_SRV, 0);
+    //skybox_range_cube.insert(skyBox);
+    //EfgDescriptorRange skybox_rangeSampler = EfgDescriptorRange(efgRange_SAMPLER, 0);
+    //skybox_rangeSampler.insert(sampler);
+    //EfgRootParameter skybox_rootParameter_1(efgRootParamter_DESCRIPTOR_TABLE);
+    //EfgRootParameter skybox_rootParameter_2(efgRootParamter_DESCRIPTOR_TABLE);
+    //EfgRootParameter skybox_rootParameter_3(efgRootParamter_DESCRIPTOR_TABLE);
+    //skybox_rootParameter_1.insert(skybox_range_CBV);
+    //skybox_rootParameter_2.insert(skybox_range_cube);
+    //skybox_rootParameter_3.insert(skybox_rangeSampler);
+    //EfgRootSignature skybox_rootSignature;
+    //skybox_rootSignature.insert(skybox_rootParameter_1);
+    //skybox_rootSignature.insert(skybox_rootParameter_2);
+    //skybox_rootSignature.insert(skybox_rootParameter_3);
+    //efg.CreateRootSignature(skybox_rootSignature);
+    //EfgProgram skyboxProgram = efg.CreateProgram(L"skybox.hlsl");
+    //EfgPSO skyboxPso = efg.CreateGraphicsPipelineState(skyboxProgram, skybox_rootSignature);
 
     EfgDescriptorRange range = EfgDescriptorRange(efgRange_CBV, 0);
     range.insert(viewProjBuffer);
@@ -221,8 +244,14 @@ int main()
     rootSignature.insert(rootParameter6);
     efg.CreateRootSignature(rootSignature);
 
-    EfgProgram program = efg.CreateProgram(L"shaders.hlsl");
+    EfgProgram program;
+    program.vertexShader = efg.CreateShader(L"vertex.hlsl", "vs_5_0");
+    program.pixelShader = efg.CreateShader(L"shaders.hlsl", "ps_5_0");
     EfgPSO pso = efg.CreateGraphicsPipelineState(program, rootSignature);
+
+    EfgProgram shadowMap_program;
+    shadowMap_program.vertexShader = program.vertexShader;
+    EfgPSO shadowMapPSO = efg.CreateShadowMapPSO(program, rootSignature);
 
     float deltaTime = 0.0f;
     float lastFrameTime = GetTimeInSeconds();
@@ -240,7 +269,6 @@ int main()
         efg.BindRootDescriptorTable(rootSignature);
         efg.UpdateConstantBuffer(viewProjBuffer, &camera.viewProj, sizeof(camera.viewProj));
         efg.UpdateConstantBuffer(viewPosBuffer, &camera.eye, sizeof(camera.eye));
-
 
         XMFLOAT4X4 skybox_view = camera.view;
         skybox_view._41 = 0.0f;
@@ -269,12 +297,14 @@ int main()
             EfgInstanceBatch instances = mesh.materialBatches[m];
             if(mesh.textures[m].diffuse_map.handle > 0)
                 efg.Bind2DTexture(6, mesh.textures[m].diffuse_map);
-            efg.BindConstantBuffer(2, sphere.constantsBuffer);
+            efg.BindConstantBuffer(2, mesh.constantsBuffer);
             efg.BindConstantBuffer(3, mesh.materialBuffers[m]);
             efg.BindVertexBuffer(instances.vertexBuffer);
             efg.BindIndexBuffer(instances.indexBuffer);
             efg.DrawIndexedInstanced(instances.indexCount);
         }
+
+        efg.SetPipelineState(shadowMapPSO);
 
         //efg.SetPipelineState(skyboxPso);
         //efg.BindRootDescriptorTable(skybox_rootSignature);

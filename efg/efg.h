@@ -207,6 +207,7 @@ public:
     EfgTexture CreateTextureCube(const std::vector<std::wstring>& filenames);
     EfgSampler CreateSampler();
     EfgTexture CreateShadowMap(uint32_t width, uint32_t height);
+    void ClearDepthStencilView(EfgTexture texture);
     void CreateRootSignature(EfgRootSignature& rootSignature);
     void UpdateConstantBuffer(EfgBuffer& buffer, void const* data, UINT size);
     void UpdateStructuredBuffer(EfgBuffer& buffer, void const* data, UINT size);
@@ -214,12 +215,14 @@ public:
     void BindIndexBuffer(EfgIndexBuffer buffer);
     void Bind2DTexture(uint32_t index, const EfgTexture& texture);
     void BindConstantBuffer(uint32_t index, const EfgBuffer& buffer);
+    void BindStructuredBuffer(uint32_t index, const EfgBuffer& buffer);
     void BindRootDescriptorTable(EfgRootSignature& rootSignature);
     EfgResult CommitShaderResources();
     EfgShader CreateShader(LPCWSTR fileName, LPCSTR target, LPCSTR entryPoint = "Main");
     EfgPSO CreateGraphicsPipelineState(EfgProgram program, EfgRootSignature& rootSignature);
     EfgPSO CreateShadowMapPSO(EfgProgram program, EfgRootSignature rootSignature);
     void SetPipelineState(EfgPSO pso);
+    void SetRenderTarget(EfgTexture texture);
     void DrawInstanced(uint32_t vertexCount);
     void DrawIndexedInstanced(uint32_t indexCount, uint32_t instanceCount = 1);
     EfgImportMesh LoadFromObj(const char* basePath, const char* file);
@@ -313,6 +316,7 @@ private:
     UINT m_samplerDescriptorSize = 0;
     uint32_t m_cbvDescriptorCount = 0;
     uint32_t m_srvDescriptorCount = 0;
+    uint32_t m_dsvDescriptorCount = 0;
     uint32_t m_textureCount = 0;
     uint32_t m_textureCubeCount = 0;
     uint32_t m_samplerCount = 0;

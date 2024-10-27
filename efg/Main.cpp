@@ -103,7 +103,7 @@ int main()
     sphere.material.shininess = 32.0f;
     sphere.material.diffuseMapFlag = true;
     EfgBuffer materialBuffer = efg.CreateConstantBuffer<EfgMaterialBuffer>(&sphere.material, 1);
-    sphere.transform.translation = XMFLOAT3(1.0f, 1.0f, 1.0f);
+    sphere.transform.translation = XMFLOAT3(0.0f, 10.0f, 0.0f);
     sphere.transform.scale = XMFLOAT3(1.0f, 1.0f, 1.0f);
     sphere.transform.rotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
     sphere.constantsBuffer = efg.CreateConstantBuffer<ObjectConstants>(&sphere.constants, 1);
@@ -244,14 +244,26 @@ int main()
     rootSignature.insert(rootParameter6);
     efg.CreateRootSignature(rootSignature);
 
+    EfgRootParameter shadowMap_rootParameter0(efgRootParameter_CBV);
+    EfgRootParameter shadowMap_rootParameter1(efgRootParameter_CBV);
+    EfgRootParameter shadowMap_rootParameter2(efgRootParameter_CBV);
+    EfgRootParameter shadowMap_rootParameter3(efgRootParamter_SRV);
+
+    EfgRootSignature shadowMap_rootSignature;
+    shadowMap_rootSignature.insert(shadowMap_rootParameter0);
+    shadowMap_rootSignature.insert(shadowMap_rootParameter1);
+    shadowMap_rootSignature.insert(shadowMap_rootParameter2);
+    shadowMap_rootSignature.insert(shadowMap_rootParameter3);
+    efg.CreateRootSignature(shadowMap_rootSignature);
+
     EfgProgram program;
     program.vertexShader = efg.CreateShader(L"vertex.hlsl", "vs_5_0");
     program.pixelShader = efg.CreateShader(L"shaders.hlsl", "ps_5_0");
     EfgPSO pso = efg.CreateGraphicsPipelineState(program, rootSignature);
 
     EfgProgram shadowMap_program;
-    shadowMap_program.vertexShader = program.vertexShader;
-    EfgPSO shadowMapPSO = efg.CreateShadowMapPSO(program, rootSignature);
+    shadowMap_program.vertexShader = efg.CreateShader(L"shadowMap_vertex.hlsl", "vs_5_0");
+    EfgPSO shadowMapPSO = efg.CreateShadowMapPSO(shadowMap_program, shadowMap_rootSignature);
 
     float deltaTime = 0.0f;
     float lastFrameTime = GetTimeInSeconds();
@@ -305,6 +317,28 @@ int main()
         }
 
         efg.SetPipelineState(shadowMapPSO);
+        efg.BindRootDescriptorTable(shadowMap_rootSignature);
+        efg.ClearDepthStencilView(shadowMap);
+        efg.SetRenderTarget(shadowMap);
+        efg.BindConstantBuffer(0, dirLightViewProj);
+        efg.BindStructuredBuffer(3, transformMatrixBuffer);
+        efg.BindVertexBuffer(sphere.vertexBuffer);
+        efg.BindIndexBuffer(sphere.indexBuffer);
+        efg.BindConstantBuffer(1, sphere.transformBuffer);
+        efg.BindConstantBuffer(2, sphere.constantsBuffer);
+        efg.DrawIndexedInstanced(square.indexCount, 1);
+
+        efg.BindConstantBuffer(2, sphereInstanced.constantsBuffer);
+        efg.DrawIndexedInstanced(square.indexCount, 2000);
+
+        for (size_t m = 0; m < mesh.materialBatches.size(); m++)
+        {
+            EfgInstanceBatch instances = mesh.materialBatches[m];
+            efg.BindConstantBuffer(2, mesh.constantsBuffer);
+            efg.BindVertexBuffer(instances.vertexBuffer);
+            efg.BindIndexBuffer(instances.indexBuffer);
+            efg.DrawIndexedInstanced(instances.indexCount);
+        }
 
         //efg.SetPipelineState(skyboxPso);
         //efg.BindRootDescriptorTable(skybox_rootSignature);

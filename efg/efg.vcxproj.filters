@@ -67,6 +67,7 @@
     <CustomBuild Include="shaders.hlsl" />
     <CustomBuild Include="skybox.hlsl" />
     <CustomBuild Include="vertex.hlsl" />
+    <CustomBuild Include="shadowMap_vertex.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

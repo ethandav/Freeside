@@ -217,6 +217,10 @@ void EfgContext::LoadPipeline()
 
 void EfgContext::CreateDepthBuffer()
 {
+    EfgTexture texture = {};
+    EfgTextureInternal* textureInternal = new EfgTextureInternal();
+    texture.handle = reinterpret_cast<uint64_t>(textureInternal);
+
     D3D12_RESOURCE_DESC depthStencilDesc = {};
     depthStencilDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
     depthStencilDesc.Width = 1920;
@@ -248,8 +252,11 @@ void EfgContext::CreateDepthBuffer()
     dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
     dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
     
-    D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
-    m_device->CreateDepthStencilView(depthStencilBuffer.Get(), &dsvDesc, dsvHandle);
+    textureInternal->srvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
+    textureInternal->srvHandle.Offset(m_dsvDescriptorCount, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
+    m_dsvDescriptorCount++;
+
+    m_device->CreateDepthStencilView(depthStencilBuffer.Get(), &dsvDesc, textureInternal->srvHandle);
 }
 
 EfgTexture EfgContext::CreateShadowMap(uint32_t width, uint32_t height)
@@ -287,8 +294,12 @@ EfgTexture EfgContext::CreateShadowMap(uint32_t width, uint32_t height)
     dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
     dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
     dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+
+    textureInternal->srvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
+    textureInternal->srvHandle.Offset(m_dsvDescriptorCount, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
+    m_dsvDescriptorCount++;
     
-    m_device->CreateDepthStencilView(textureInternal->resource.Get(), &dsvDesc, dsvHeap->GetCPUDescriptorHandleForHeapStart());
+    m_device->CreateDepthStencilView(textureInternal->resource.Get(), &dsvDesc, textureInternal->srvHandle);
 
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
         textureInternal->resource.Get(),
@@ -986,12 +997,13 @@ EfgPSO EfgContext::CreateShadowMapPSO(EfgProgram program, EfgRootSignature rootS
         { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
     };
     ZeroMemory(&pso.desc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
+    pso.rootSignature = rootSignature.Get();
     pso.desc.pRootSignature = rootSignature.Get().Get();
     pso.desc.VS = CD3DX12_SHADER_BYTECODE(program.vertexShader.byteCode.Get());
     pso.desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     pso.desc.SampleMask = UINT_MAX;
     pso.desc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-    pso.desc.RasterizerState.CullMode = D3D12_CULL_MODE_FRONT;
+    pso.desc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
     pso.desc.RasterizerState.DepthBias = 1000;
     pso.desc.RasterizerState.DepthBiasClamp = 0.0f;
     pso.desc.RasterizerState.SlopeScaledDepthBias = 1.0f;
@@ -1011,12 +1023,26 @@ EfgPSO EfgContext::CreateShadowMapPSO(EfgProgram program, EfgRootSignature rootS
 
 void EfgContext::SetPipelineState(EfgPSO pso)
 {
-    // Set necessary state.
     m_commandList->SetGraphicsRootSignature(pso.rootSignature.Get());
     m_commandList->RSSetViewports(1, &m_viewport);
     m_commandList->RSSetScissorRects(1, &m_scissorRect);
     m_commandList->SetPipelineState(pso.pipelineState.Get());
     m_boundPSO = pso;
+}
+
+void EfgContext::SetRenderTarget(EfgTexture texture)
+{
+    EfgTextureInternal* textureInternal = reinterpret_cast<EfgTextureInternal*>(texture.handle);
+    m_commandList->OMSetRenderTargets(0, nullptr, false, &textureInternal->srvHandle);
+}
+
+void EfgContext::ClearDepthStencilView(EfgTexture texture)
+{
+    EfgTextureInternal* textureInternal = reinterpret_cast<EfgTextureInternal*>(texture.handle);
+    m_commandList->ClearDepthStencilView(textureInternal->srvHandle,
+        D3D12_CLEAR_FLAG_DEPTH,
+        1.0f, 0, 0, nullptr
+    );
 }
 
 void EfgContext::BindVertexBuffer(EfgVertexBuffer buffer)
@@ -1041,6 +1067,12 @@ void EfgContext::BindConstantBuffer(uint32_t index, const EfgBuffer& buffer)
 {
     EfgBufferInternal* bufferInternal = reinterpret_cast<EfgBufferInternal*>(buffer.handle);
     m_commandList->SetGraphicsRootConstantBufferView(index, bufferInternal->m_bufferResource.Get()->GetGPUVirtualAddress());
+}
+
+void EfgContext::BindStructuredBuffer(uint32_t index, const EfgBuffer& buffer)
+{
+    EfgBufferInternal* bufferInternal = reinterpret_cast<EfgBufferInternal*>(buffer.handle);
+    m_commandList->SetGraphicsRootShaderResourceView(index, bufferInternal->m_bufferResource.Get()->GetGPUVirtualAddress());
 }
 
 void EfgContext::CompileShader(EfgShader& shader, LPCSTR entryPoint, LPCSTR target)

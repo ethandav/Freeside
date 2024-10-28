@@ -202,12 +202,13 @@ public:
     EfgIndexBuffer CreateIndexBuffer(void const* data, UINT size);
     EfgBuffer CreateConstantBuffer(void const* data, UINT size);
     EfgBuffer CreateStructuredBuffer(void const* data, UINT size, uint32_t numElements, size_t stride);
-    EfgTexture CreateDepthBuffer();
+    EfgTexture CreateDepthBuffer(uint32_t width, uint32_t height);
+    EfgTexture CreateShadowMap(uint32_t width, uint32_t height);
     EfgTexture CreateTexture2D();
     EfgTexture CreateTexture2DFromFile(const wchar_t* filename);
     EfgTexture CreateTextureCube(const std::vector<std::wstring>& filenames);
-    EfgSampler CreateSampler();
-    EfgTexture CreateShadowMap(uint32_t width, uint32_t height);
+    EfgSampler CreateTextureSampler();
+    EfgSampler CreateDepthSampler();
     EfgTexture CreateColorBuffer(uint32_t width, uint32_t height);
     void Copy2DTextureToBackbuffer(EfgTexture);
     void ClearRenderTargetView(EfgTexture texture);
@@ -227,6 +228,7 @@ public:
     EfgPSO CreateShadowMapPSO(EfgProgram program, EfgRootSignature rootSignature);
     void SetPipelineState(EfgPSO pso);
     void SetRenderTarget(EfgTexture texture, EfgTexture* depthStencil = nullptr);
+    void SetRenderTargetResolution(uint32_t width, uint32_t height);
     void DrawInstanced(uint32_t vertexCount);
     void DrawIndexedInstanced(uint32_t indexCount, uint32_t instanceCount = 1);
     EfgImportMesh LoadFromObj(const char* basePath, const char* file);

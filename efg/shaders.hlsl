@@ -8,6 +8,11 @@ cbuffer LightConstants : register(b2)
     uint numPointlights;
 }
 
+cbuffer DirLightViewProj : register(b3)
+{
+    matrix dirLightViewProj;
+}
+
 struct EfgMaterialBuffer
 {
     float4 ambient;
@@ -26,7 +31,7 @@ struct EfgMaterialBuffer
     float padding[3];
 };
 
-cbuffer MatBuffer : register(b5)
+cbuffer MatBuffer : register(b6)
 {
     EfgMaterialBuffer mat;
 }
@@ -39,7 +44,7 @@ struct DirLightBuffer
     float4 diffuse;
     float4 specular;
 };
-cbuffer DirLight : register(b6)
+cbuffer DirLight : register(b7)
 {
     DirLightBuffer dirLight;
 }
@@ -58,6 +63,7 @@ StructuredBuffer<LightData> lights : register(t0);
 Texture2D diffuseMap: register(t2);
 Texture2D shadowMap: register(t3);
 SamplerState textureSampler : register(s0);
+SamplerComparisonState shadowSampler : register(s1);
 
 struct PSInput
 {
@@ -67,7 +73,35 @@ struct PSInput
     float2 uv : TEXCOORD;
 };
 
-float3 calculateDirLight(float3 normal, float3 viewDir, float2 uv)
+float CalculateShadow(float3 fragPos, float3 normal, float3 lightDir) {
+    // Transform world position to light space
+    float4 lightSpacePos = mul(dirLightViewProj, float4(fragPos, 1.0));
+    float3 projCoords = lightSpacePos.xyz / lightSpacePos.w; // Perspective divide
+    projCoords = projCoords * 0.5f + 0.5f;                   // Map to [0, 1] UV coordinates
+
+    // Early return if outside shadow map bounds
+    if (projCoords.x < 0.0f || projCoords.x > 1.0f || projCoords.y < 0.0f || projCoords.y > 1.0f) {
+        return 1.0f; // No shadow if outside bounds
+    }
+
+    // Calculate dynamic bias based on normal and light direction
+    float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
+    float shadow = 0.0f;
+
+    // Perform PCF with dynamic bias
+    for (int x = -1; x <= 1; ++x) {
+        for (int y = -1; y <= 1; ++y) {
+            float2 offset = float2(x, y) * 0.001f;
+            shadow += shadowMap.SampleCmpLevelZero(shadowSampler, projCoords.xy + offset, lightSpacePos.z - bias);
+        }
+    }
+
+    // Average the shadow samples for smoothness
+    shadow /= 9.0f;
+    return shadow;
+}
+
+float3 calculateDirLight(float3 fragPos, float3 normal, float3 viewDir, float2 uv)
 {
     float3 lightDir = normalize(-dirLight.direction);
     float diff = max(dot(normal, lightDir), 0.0);
@@ -76,14 +110,16 @@ float3 calculateDirLight(float3 normal, float3 viewDir, float2 uv)
 
     float3 texDiffuse, ambient, diffuse, specular;
 
+    float shadow = CalculateShadow(fragPos, normal, lightDir);
+
     if(mat.diffuseMapFlag > 0)
         texDiffuse = diffuseMap.Sample(textureSampler, uv).xyz;
     else
         texDiffuse = mat.diffuse.xyz;
 
     ambient = (dirLight.ambient * dirLight.color).xyz * texDiffuse;
-    diffuse = (dirLight.diffuse.xyz * dirLight.color.xyz) * diff * texDiffuse;
-    specular = dirLight.specular.xyz * spec * mat.specular.xyz;
+    diffuse = (dirLight.diffuse.xyz * dirLight.color.xyz) * diff * texDiffuse * shadow;
+    specular = dirLight.specular.xyz * spec * mat.specular.xyz * shadow;
 
     return ambient + diffuse + specular;
 
@@ -133,7 +169,7 @@ float4 Main(PSInput input) : SV_TARGET
     
     float3 color = float3(0.0f, 0.0f, 0.0);
 
-    color += calculateDirLight(normal, viewDir, input.uv);
+    color += calculateDirLight(input.fragPos, normal, viewDir, input.uv);
 
     for (uint i = 0; i < numPointlights; ++i)
     {

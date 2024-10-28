@@ -214,7 +214,7 @@ void EfgContext::LoadPipeline()
     EFG_D3D_TRY(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
 }
 
-EfgTexture EfgContext::CreateDepthBuffer()
+EfgTexture EfgContext::CreateDepthBuffer(uint32_t width, uint32_t height)
 {
     EfgTexture texture = {};
     EfgTextureInternal* textureInternal = new EfgTextureInternal();
@@ -222,8 +222,8 @@ EfgTexture EfgContext::CreateDepthBuffer()
 
     D3D12_RESOURCE_DESC depthStencilDesc = {};
     depthStencilDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    depthStencilDesc.Width = 1920;
-    depthStencilDesc.Height = 1080;
+    depthStencilDesc.Width = width;
+    depthStencilDesc.Height = height;
     depthStencilDesc.DepthOrArraySize = 1;
     depthStencilDesc.MipLevels = 1;
     depthStencilDesc.Format = DXGI_FORMAT_D32_FLOAT;
@@ -243,8 +243,10 @@ EfgTexture EfgContext::CreateDepthBuffer()
         &depthStencilDesc,
         D3D12_RESOURCE_STATE_DEPTH_WRITE,
         &depthOptimizedClearValue,
-        IID_PPV_ARGS(&depthStencilBuffer)
+        IID_PPV_ARGS(&textureInternal->resource)
     );
+
+    textureInternal->currState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 
     D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
     dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
@@ -255,7 +257,7 @@ EfgTexture EfgContext::CreateDepthBuffer()
     textureInternal->dsvHandle.Offset(m_dsvDescriptorCount, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
     m_dsvDescriptorCount++;
 
-    m_device->CreateDepthStencilView(depthStencilBuffer.Get(), &dsvDesc, textureInternal->dsvHandle);
+    m_device->CreateDepthStencilView(textureInternal->resource.Get(), &dsvDesc, textureInternal->dsvHandle);
 
     return texture;
 }
@@ -302,11 +304,16 @@ EfgTexture EfgContext::CreateShadowMap(uint32_t width, uint32_t height)
     
     m_device->CreateDepthStencilView(textureInternal->resource.Get(), &dsvDesc, textureInternal->dsvHandle);
 
+    textureInternal->format = DXGI_FORMAT_R32_FLOAT;
+    m_textures.push_back(textureInternal);
+    m_textureCount++;
+
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
         textureInternal->resource.Get(),
         D3D12_RESOURCE_STATE_GENERIC_READ,
         D3D12_RESOURCE_STATE_DEPTH_WRITE
     ));
+    textureInternal->currState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 
     return texture;
 }
@@ -359,6 +366,7 @@ EfgTexture EfgContext::CreateColorBuffer(uint32_t width, uint32_t height)
         D3D12_RESOURCE_STATE_GENERIC_READ,
         D3D12_RESOURCE_STATE_RENDER_TARGET
     ));
+    textureInternal->currState = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
     return texture;
 }
@@ -547,7 +555,7 @@ void EfgContext::CreateTextureView(EfgTextureInternal* texture, uint32_t heapOff
 {
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.Format = texture->resource.Get()->GetDesc().Format;
+    srvDesc.Format = texture->format;
     srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Texture2D.MostDetailedMip = 0;
     srvDesc.Texture2D.MipLevels = texture->resource.Get()->GetDesc().MipLevels;
@@ -850,7 +858,9 @@ EfgTexture EfgContext::CreateTexture2DFromFile(const wchar_t* filename)
     EFG_D3D_TRY(CreateWICTextureFromFile(m_device.Get(), resourceUpload, filename, textureInternal->resource.ReleaseAndGetAddressOf()));
     auto uploadResourcesFinished = resourceUpload.End(m_commandQueue.Get());
     uploadResourcesFinished.wait();
+    textureInternal->format = textureInternal->resource.Get()->GetDesc().Format;
     texture.index = m_textureCount;
+    textureInternal->currState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     m_textures.push_back(textureInternal);
     m_textureCount++;
     return texture;
@@ -948,7 +958,7 @@ EfgTexture EfgContext::CreateTextureCube(const std::vector<std::wstring>& filena
     return texture;
 }
 
-EfgSampler EfgContext::CreateSampler()
+EfgSampler EfgContext::CreateTextureSampler()
 {
     EfgSampler sampler = {};
     EfgSamplerInternal* samplerInternal = new EfgSamplerInternal();
@@ -965,6 +975,24 @@ EfgSampler EfgContext::CreateSampler()
     samplerInternal->desc.BorderColor[2] = 1.0f;
     samplerInternal->desc.BorderColor[3] = 1.0f;
     samplerInternal->desc.MinLOD = 0.0f;
+    samplerInternal->desc.MaxLOD = D3D12_FLOAT32_MAX;
+    m_samplers.push_back(samplerInternal);
+    m_samplerCount++;
+
+    return sampler;
+}
+
+EfgSampler EfgContext::CreateDepthSampler()
+{
+    EfgSampler sampler = {};
+    EfgSamplerInternal* samplerInternal = new EfgSamplerInternal();
+    sampler.handle = reinterpret_cast<uint64_t>(samplerInternal);
+    samplerInternal->desc.Filter = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT; // Linear filtering with comparison
+    samplerInternal->desc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    samplerInternal->desc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    samplerInternal->desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    samplerInternal->desc.ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+    samplerInternal->desc.MinLOD = 0;
     samplerInternal->desc.MaxLOD = D3D12_FLOAT32_MAX;
     m_samplers.push_back(samplerInternal);
     m_samplerCount++;
@@ -1135,9 +1163,33 @@ void EfgContext::SetRenderTarget(EfgTexture texture, EfgTexture* depthStencil)
     }
 }
 
+void EfgContext::SetRenderTargetResolution(uint32_t width, uint32_t height)
+{
+    D3D12_VIEWPORT shadowViewport = {};
+    shadowViewport.TopLeftX = 0.0f;
+    shadowViewport.TopLeftY = 0.0f;
+    shadowViewport.Width = static_cast<float>(width);
+    shadowViewport.Height = static_cast<float>(height);
+    shadowViewport.MinDepth = 0.0f;
+    shadowViewport.MaxDepth = 1.0f;
+    m_commandList->RSSetViewports(1, &shadowViewport);
+
+    D3D12_RECT shadowScissorRect = {};
+    shadowScissorRect.left = 0;
+    shadowScissorRect.top = 0;
+    shadowScissorRect.right = width;
+    shadowScissorRect.bottom = height;
+    m_commandList->RSSetScissorRects(1, &shadowScissorRect);
+}
+
 void EfgContext::ClearDepthStencilView(EfgTexture texture)
 {
     EfgTextureInternal* textureInternal = reinterpret_cast<EfgTextureInternal*>(texture.handle);
+    if (textureInternal->currState != D3D12_RESOURCE_STATE_DEPTH_WRITE)
+    {
+        TransitionResourceState(textureInternal->resource, textureInternal->currState, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+        textureInternal->currState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    }
     CD3DX12_CPU_DESCRIPTOR_HANDLE handle = {};
     if (textureInternal->dsvHandle.ptr != 0)
         handle = textureInternal->dsvHandle;
@@ -1170,6 +1222,11 @@ void EfgContext::Bind2DTexture(uint32_t index, const EfgTexture& texture)
 {
     m_boundTexture = &texture;
     EfgTextureInternal* textureInternal = reinterpret_cast<EfgTextureInternal*>(texture.handle);
+    if (textureInternal->currState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
+    {
+        TransitionResourceState(textureInternal->resource, textureInternal->currState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        textureInternal->currState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
     CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), textureInternal->heapOffset, m_cbvSrvDescriptorSize);
     m_commandList->SetGraphicsRootDescriptorTable(index, gpuHandle);
 }

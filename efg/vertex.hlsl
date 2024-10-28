@@ -3,7 +3,7 @@ cbuffer ViewProjectionBuffer : register(b0)
     matrix viewProjectionMatrix;
 }
 
-cbuffer TransformBuffer : register(b3)
+cbuffer TransformBuffer : register(b4)
 {
     matrix transform;
 }
@@ -14,7 +14,7 @@ struct ObjectConstants
     uint useTransform;
     int padding[2];
 };
-cbuffer ObjectConstantsBuffer : register(b4)
+cbuffer ObjectConstantsBuffer : register(b5)
 {
     ObjectConstants constants;
 }

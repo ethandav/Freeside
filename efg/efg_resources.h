@@ -29,6 +29,7 @@ struct EfgResource
 {
     uint32_t heapOffset = 0;
     uint32_t registerIndex = 0;
+    D3D12_RESOURCE_STATES currState;
 };
 
 struct EfgBufferInternal : public EfgResource
@@ -73,6 +74,7 @@ struct EfgBuffer
 struct EfgTextureInternal : EfgResource
 {
     ComPtr<ID3D12Resource> resource;
+    DXGI_FORMAT format;
     D3D12_SHADER_RESOURCE_VIEW_DESC viewDesc = {};
     CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle = {};
     CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle = {};

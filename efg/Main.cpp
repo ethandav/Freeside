@@ -77,6 +77,9 @@ int main()
     efg.initialize(efgWindow);
     Camera camera = efgCreateCamera(efg, DirectX::XMFLOAT3(0.0f, 5.0f, 5.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f));
 
+    EfgTexture depthBuffer = efg.CreateDepthBuffer();
+    EfgTexture colorBuffer = efg.CreateColorBuffer(1920,1080);
+
     Shape square = Shapes::getShape(Shapes::SPHERE);
 	std::mt19937 rng(std::random_device{}());
 	std::uniform_real_distribution<float> dist(-50.0f, 50.0f);
@@ -150,8 +153,8 @@ int main()
     EfgBuffer dirLightBuffer = efg.CreateConstantBuffer<DirLightBuffer>(&dirLight, 1);
     EfgBuffer transformMatrixBuffer = efg.CreateStructuredBuffer<XMMATRIX>(transformMatrices.data(), (uint32_t)transformMatrices.size());
 
-    EfgTexture texture = efg.CreateTexture2D(L"earth.jpeg");
-    EfgTexture texture2 = efg.CreateTexture2D(L"water.jpg");
+    EfgTexture texture = efg.CreateTexture2DFromFile(L"earth.jpeg");
+    EfgTexture texture2 = efg.CreateTexture2DFromFile(L"water.jpg");
 
     EfgSampler sampler = efg.CreateSampler();
 
@@ -214,7 +217,7 @@ int main()
     rangeSrv.insert(pointLightBuffer);
     rangeSrv.insert(transformMatrixBuffer);
 
-    EfgDescriptorRange rangeTex = EfgDescriptorRange(efgRange_SRV, 2, 1);
+    EfgDescriptorRange rangeTex = EfgDescriptorRange(efgRange_SRV, 2, 2);
 
     EfgDescriptorRange rangeSampler = EfgDescriptorRange(efgRange_SAMPLER, 0);
     rangeSampler.insert(sampler);
@@ -292,6 +295,33 @@ int main()
 
         efg.BindConstantBuffer(4, dirLightBuffer);
 
+        efg.BindVertexBuffer(sphere.vertexBuffer);
+        efg.BindIndexBuffer(sphere.indexBuffer);
+        efg.Bind2DTexture(6, texture);
+        efg.BindConstantBuffer(1, sphere.transformBuffer);
+        efg.BindConstantBuffer(2, sphere.constantsBuffer);
+        efg.BindConstantBuffer(3, materialBuffer);
+        efg.DrawIndexedInstanced(square.indexCount, 1);
+
+        efg.Bind2DTexture(6, texture2);
+        efg.BindConstantBuffer(2, sphereInstanced.constantsBuffer);
+        efg.DrawIndexedInstanced(square.indexCount, 2000);
+
+        for (size_t m = 0; m < mesh.materialBatches.size(); m++)
+        {
+            EfgInstanceBatch instances = mesh.materialBatches[m];
+            if(mesh.textures[m].diffuse_map.handle > 0)
+                efg.Bind2DTexture(6, mesh.textures[m].diffuse_map);
+            efg.BindConstantBuffer(2, mesh.constantsBuffer);
+            efg.BindConstantBuffer(3, mesh.materialBuffers[m]);
+            efg.BindVertexBuffer(instances.vertexBuffer);
+            efg.BindIndexBuffer(instances.indexBuffer);
+            efg.DrawIndexedInstanced(instances.indexCount);
+        }
+
+        efg.SetRenderTarget(colorBuffer, &depthBuffer);
+        efg.ClearRenderTargetView(colorBuffer);
+        efg.ClearDepthStencilView(depthBuffer);
         efg.BindVertexBuffer(sphere.vertexBuffer);
         efg.BindIndexBuffer(sphere.indexBuffer);
         efg.Bind2DTexture(6, texture);

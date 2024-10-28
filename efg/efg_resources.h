@@ -75,6 +75,8 @@ struct EfgTextureInternal : EfgResource
     ComPtr<ID3D12Resource> resource;
     D3D12_SHADER_RESOURCE_VIEW_DESC viewDesc = {};
     CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle = {};
+    CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle = {};
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle = {};
 };
 
 struct EfgTexture

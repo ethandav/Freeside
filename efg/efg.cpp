@@ -186,7 +186,8 @@ void EfgContext::LoadPipeline()
     EFG_D3D_TRY(swapChain.As(&m_swapChain));
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-    m_rtvHeap = CreateDescriptorHeap(FrameCount, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    m_backBufferHeap = CreateDescriptorHeap(FrameCount, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    m_rtvHeap = CreateDescriptorHeap(1, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
     m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
     D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
@@ -197,11 +198,9 @@ void EfgContext::LoadPipeline()
 
     EFG_D3D_TRY(m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&dsvHeap)));
 
-    CreateDepthBuffer();
-
     // Create frame resources.
     {
-        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
+        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_backBufferHeap->GetCPUDescriptorHandleForHeapStart());
 
         // Create a RTV for each frame.
         for (UINT n = 0; n < FrameCount; n++)
@@ -215,7 +214,7 @@ void EfgContext::LoadPipeline()
     EFG_D3D_TRY(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
 }
 
-void EfgContext::CreateDepthBuffer()
+EfgTexture EfgContext::CreateDepthBuffer()
 {
     EfgTexture texture = {};
     EfgTextureInternal* textureInternal = new EfgTextureInternal();
@@ -252,11 +251,13 @@ void EfgContext::CreateDepthBuffer()
     dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
     dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
     
-    textureInternal->srvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
-    textureInternal->srvHandle.Offset(m_dsvDescriptorCount, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
+    textureInternal->dsvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
+    textureInternal->dsvHandle.Offset(m_dsvDescriptorCount, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
     m_dsvDescriptorCount++;
 
-    m_device->CreateDepthStencilView(depthStencilBuffer.Get(), &dsvDesc, textureInternal->srvHandle);
+    m_device->CreateDepthStencilView(depthStencilBuffer.Get(), &dsvDesc, textureInternal->dsvHandle);
+
+    return texture;
 }
 
 EfgTexture EfgContext::CreateShadowMap(uint32_t width, uint32_t height)
@@ -295,17 +296,63 @@ EfgTexture EfgContext::CreateShadowMap(uint32_t width, uint32_t height)
     dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
     dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
 
-    textureInternal->srvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
-    textureInternal->srvHandle.Offset(m_dsvDescriptorCount, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
+    textureInternal->dsvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
+    textureInternal->dsvHandle.Offset(m_dsvDescriptorCount, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
     m_dsvDescriptorCount++;
     
-    m_device->CreateDepthStencilView(textureInternal->resource.Get(), &dsvDesc, textureInternal->srvHandle);
+    m_device->CreateDepthStencilView(textureInternal->resource.Get(), &dsvDesc, textureInternal->dsvHandle);
 
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
         textureInternal->resource.Get(),
         D3D12_RESOURCE_STATE_GENERIC_READ,
         D3D12_RESOURCE_STATE_DEPTH_WRITE
     ));
+
+    return texture;
+}
+
+EfgTexture EfgContext::CreateColorBuffer(uint32_t width, uint32_t height)
+{
+    EfgTexture texture = {};
+    EfgTextureInternal* textureInternal = new EfgTextureInternal();
+    texture.handle = reinterpret_cast<uint64_t>(textureInternal);
+
+    D3D12_RESOURCE_DESC colorBufferDesc = {};
+    colorBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    colorBufferDesc.Width = width;
+    colorBufferDesc.Height = height;
+    colorBufferDesc.DepthOrArraySize = 1;
+    colorBufferDesc.MipLevels = 1;
+    colorBufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    colorBufferDesc.SampleDesc.Count = 1;
+    colorBufferDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+    D3D12_CLEAR_VALUE clearValue = {};
+    clearValue.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    clearValue.Color[0] = 0.0f;
+    clearValue.Color[1] = 0.0f;
+    clearValue.Color[2] = 0.0f;
+    clearValue.Color[3] = 0.0f;
+    
+    CD3DX12_HEAP_PROPERTIES heapProperties(D3D12_HEAP_TYPE_DEFAULT);
+    m_device->CreateCommittedResource(
+        &heapProperties,
+        D3D12_HEAP_FLAG_NONE,
+        &colorBufferDesc,
+        D3D12_RESOURCE_STATE_RENDER_TARGET,
+        &clearValue,
+        IID_PPV_ARGS(&textureInternal->resource)
+    );
+
+    textureInternal->rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
+    textureInternal->rtvHandle.Offset(m_rtvDescriptorCount, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV));
+    m_rtvDescriptorCount++;
+
+    D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+    rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+    rtvDesc.Texture2D.MipSlice = 0;
+    m_device->CreateRenderTargetView(textureInternal->resource.Get(), &rtvDesc, textureInternal->rtvHandle);
 
     return texture;
 }
@@ -365,7 +412,8 @@ void EfgContext::Frame()
     // Indicate that the back buffer will be used as a render target.
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_backBufferHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
     D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
     m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
@@ -753,7 +801,16 @@ EfgBuffer EfgContext::CreateStructuredBuffer(void const* data, UINT size, uint32
     return buffer;
 }
 
-EfgTexture EfgContext::CreateTexture2D(const wchar_t* filename)
+EfgTexture EfgContext::CreateTexture2D()
+{
+    EfgTexture texture = {};
+    EfgTextureInternal* textureInternal = new EfgTextureInternal();
+    texture.handle = reinterpret_cast<uint64_t>(textureInternal);
+
+    return texture;
+}
+
+EfgTexture EfgContext::CreateTexture2DFromFile(const wchar_t* filename)
 {
     EfgTexture texture = {};
     EfgTextureInternal* textureInternal = new EfgTextureInternal();
@@ -1030,19 +1087,43 @@ void EfgContext::SetPipelineState(EfgPSO pso)
     m_boundPSO = pso;
 }
 
-void EfgContext::SetRenderTarget(EfgTexture texture)
+void EfgContext::SetRenderTarget(EfgTexture texture, EfgTexture* depthStencil)
 {
     EfgTextureInternal* textureInternal = reinterpret_cast<EfgTextureInternal*>(texture.handle);
-    m_commandList->OMSetRenderTargets(0, nullptr, false, &textureInternal->srvHandle);
+    if(textureInternal->dsvHandle.ptr != 0)
+        m_commandList->OMSetRenderTargets(0, nullptr, false, &textureInternal->dsvHandle);
+    if (textureInternal->rtvHandle.ptr != 0)
+    {
+        m_commandList->RSSetViewports(1, &m_viewport);
+        m_commandList->RSSetScissorRects(1, &m_scissorRect);
+        EfgTextureInternal* depthStencilInternal = nullptr;
+        if (depthStencil != nullptr)
+        {
+            depthStencilInternal = reinterpret_cast<EfgTextureInternal*>(depthStencil->handle);
+            m_commandList->OMSetRenderTargets(1, &textureInternal->rtvHandle, FALSE, &depthStencilInternal->dsvHandle);
+        }
+    }
 }
 
 void EfgContext::ClearDepthStencilView(EfgTexture texture)
 {
     EfgTextureInternal* textureInternal = reinterpret_cast<EfgTextureInternal*>(texture.handle);
-    m_commandList->ClearDepthStencilView(textureInternal->srvHandle,
+    CD3DX12_CPU_DESCRIPTOR_HANDLE handle = {};
+    if (textureInternal->dsvHandle.ptr != 0)
+        handle = textureInternal->dsvHandle;
+    if (textureInternal->rtvHandle.ptr != 0)
+        handle = textureInternal->rtvHandle;
+    m_commandList->ClearDepthStencilView(handle,
         D3D12_CLEAR_FLAG_DEPTH,
         1.0f, 0, 0, nullptr
     );
+}
+
+void EfgContext::ClearRenderTargetView(EfgTexture texture)
+{
+    EfgTextureInternal* textureInternal = reinterpret_cast<EfgTextureInternal*>(texture.handle);
+    const float clearColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    m_commandList->ClearRenderTargetView(textureInternal->rtvHandle, clearColor, 0, nullptr);
 }
 
 void EfgContext::BindVertexBuffer(EfgVertexBuffer buffer)
@@ -1320,7 +1401,7 @@ EfgImportMesh EfgContext::LoadFromObj(const char* basePath, const char* file)
             else
                 texPath = materials[m].diffuse_texname;
             std::wstring w_texPath(texPath.begin(), texPath.end());
-            textures.diffuse_map = CreateTexture2D(w_texPath.c_str());
+            textures.diffuse_map = CreateTexture2DFromFile(w_texPath.c_str());
         }
 
         EfgBuffer materialBuffer = CreateConstantBuffer<EfgMaterialBuffer>(&material, 1);

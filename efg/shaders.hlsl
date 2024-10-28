@@ -56,6 +56,7 @@ struct LightData
 StructuredBuffer<LightData> lights : register(t0);
 
 Texture2D diffuseMap: register(t2);
+Texture2D shadowMap: register(t3);
 SamplerState textureSampler : register(s0);
 
 struct PSInput

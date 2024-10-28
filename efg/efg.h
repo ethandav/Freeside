@@ -200,13 +200,16 @@ public:
 	void initialize(HWND window);
     EfgVertexBuffer CreateVertexBuffer(void const* data, UINT size);
     EfgIndexBuffer CreateIndexBuffer(void const* data, UINT size);
-    void CreateDepthBuffer();
     EfgBuffer CreateConstantBuffer(void const* data, UINT size);
     EfgBuffer CreateStructuredBuffer(void const* data, UINT size, uint32_t numElements, size_t stride);
-    EfgTexture CreateTexture2D(const wchar_t* filename);
+    EfgTexture CreateDepthBuffer();
+    EfgTexture CreateTexture2D();
+    EfgTexture CreateTexture2DFromFile(const wchar_t* filename);
     EfgTexture CreateTextureCube(const std::vector<std::wstring>& filenames);
     EfgSampler CreateSampler();
     EfgTexture CreateShadowMap(uint32_t width, uint32_t height);
+    EfgTexture CreateColorBuffer(uint32_t width, uint32_t height);
+    void ClearRenderTargetView(EfgTexture texture);
     void ClearDepthStencilView(EfgTexture texture);
     void CreateRootSignature(EfgRootSignature& rootSignature);
     void UpdateConstantBuffer(EfgBuffer& buffer, void const* data, UINT size);
@@ -222,7 +225,7 @@ public:
     EfgPSO CreateGraphicsPipelineState(EfgProgram program, EfgRootSignature& rootSignature);
     EfgPSO CreateShadowMapPSO(EfgProgram program, EfgRootSignature rootSignature);
     void SetPipelineState(EfgPSO pso);
-    void SetRenderTarget(EfgTexture texture);
+    void SetRenderTarget(EfgTexture texture, EfgTexture* depthStencil = nullptr);
     void DrawInstanced(uint32_t vertexCount);
     void DrawIndexedInstanced(uint32_t indexCount, uint32_t instanceCount = 1);
     EfgImportMesh LoadFromObj(const char* basePath, const char* file);
@@ -304,6 +307,7 @@ private:
     ComPtr<ID3D12Resource> m_renderTargets[FrameCount];
     ComPtr<ID3D12CommandAllocator> m_commandAllocator;
     ComPtr<ID3D12CommandQueue> m_commandQueue;
+    ComPtr<ID3D12DescriptorHeap> m_backBufferHeap;
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
     ComPtr<ID3D12DescriptorHeap> m_cbvSrvHeap;
     ComPtr<ID3D12DescriptorHeap> m_samplerHeap;
@@ -317,6 +321,7 @@ private:
     uint32_t m_cbvDescriptorCount = 0;
     uint32_t m_srvDescriptorCount = 0;
     uint32_t m_dsvDescriptorCount = 0;
+    uint32_t m_rtvDescriptorCount = 0;
     uint32_t m_textureCount = 0;
     uint32_t m_textureCubeCount = 0;
     uint32_t m_samplerCount = 0;

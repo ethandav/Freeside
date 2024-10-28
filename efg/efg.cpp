@@ -354,7 +354,37 @@ EfgTexture EfgContext::CreateColorBuffer(uint32_t width, uint32_t height)
     rtvDesc.Texture2D.MipSlice = 0;
     m_device->CreateRenderTargetView(textureInternal->resource.Get(), &rtvDesc, textureInternal->rtvHandle);
 
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+        textureInternal->resource.Get(),
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        D3D12_RESOURCE_STATE_RENDER_TARGET
+    ));
+
     return texture;
+}
+
+void EfgContext::Copy2DTextureToBackbuffer(EfgTexture texture)
+{
+    EfgTextureInternal* textureInternal = reinterpret_cast<EfgTextureInternal*>(texture.handle);
+    ComPtr<ID3D12Resource> backBuffer = m_renderTargets[m_frameIndex].Get();
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+        textureInternal->resource.Get(),
+        D3D12_RESOURCE_STATE_RENDER_TARGET,
+        D3D12_RESOURCE_STATE_COPY_SOURCE));
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+        backBuffer.Get(),
+        D3D12_RESOURCE_STATE_RENDER_TARGET,
+        D3D12_RESOURCE_STATE_COPY_DEST));
+    m_commandList->CopyResource(backBuffer.Get(), textureInternal->resource.Get());
+
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+        textureInternal->resource.Get(),
+        D3D12_RESOURCE_STATE_COPY_SOURCE,
+        D3D12_RESOURCE_STATE_RENDER_TARGET));
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+        backBuffer.Get(),
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        D3D12_RESOURCE_STATE_RENDER_TARGET));
 }
 
 ComPtr<ID3D12DescriptorHeap> EfgContext::CreateDescriptorHeap(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type)
@@ -413,17 +443,17 @@ void EfgContext::Frame()
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 
-    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_backBufferHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
-    D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
-    m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+    //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_backBufferHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+    //D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
+    //m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
     ID3D12DescriptorHeap* descriptorHeaps[] = { m_cbvSrvHeap.Get(), m_samplerHeap.Get() };
     m_commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
     // Record commands.
-    const float clearColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-    m_commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+    //const float clearColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    //m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+    //m_commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
@@ -1094,14 +1124,14 @@ void EfgContext::SetRenderTarget(EfgTexture texture, EfgTexture* depthStencil)
         m_commandList->OMSetRenderTargets(0, nullptr, false, &textureInternal->dsvHandle);
     if (textureInternal->rtvHandle.ptr != 0)
     {
-        m_commandList->RSSetViewports(1, &m_viewport);
-        m_commandList->RSSetScissorRects(1, &m_scissorRect);
-        EfgTextureInternal* depthStencilInternal = nullptr;
+        CD3DX12_CPU_DESCRIPTOR_HANDLE* handle = nullptr;
         if (depthStencil != nullptr)
         {
+            EfgTextureInternal* depthStencilInternal = nullptr;
             depthStencilInternal = reinterpret_cast<EfgTextureInternal*>(depthStencil->handle);
-            m_commandList->OMSetRenderTargets(1, &textureInternal->rtvHandle, FALSE, &depthStencilInternal->dsvHandle);
+            handle = &depthStencilInternal->dsvHandle;
         }
+        m_commandList->OMSetRenderTargets(1, &textureInternal->rtvHandle, FALSE, handle);
     }
 }
 

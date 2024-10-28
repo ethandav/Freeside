@@ -77,8 +77,13 @@ int main()
     efg.initialize(efgWindow);
     Camera camera = efgCreateCamera(efg, DirectX::XMFLOAT3(0.0f, 5.0f, 5.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f));
 
+    RECT windowRect = {};
+    GetClientRect(efgWindow, &windowRect);
+    uint32_t windowWidth = windowRect.right - windowRect.left;
+    uint32_t windowHeight = windowRect.bottom - windowRect.top;
+
     EfgTexture depthBuffer = efg.CreateDepthBuffer();
-    EfgTexture colorBuffer = efg.CreateColorBuffer(1920,1080);
+    EfgTexture colorBuffer = efg.CreateColorBuffer(windowWidth,windowHeight);
 
     Shape square = Shapes::getShape(Shapes::SPHERE);
 	std::mt19937 rng(std::random_device{}());
@@ -280,8 +285,6 @@ int main()
         efgWindowPumpEvents(efgWindow);
         efgUpdateCamera(efg, efgWindow, camera);
         efg.Frame();
-        efg.SetPipelineState(pso);
-        efg.BindRootDescriptorTable(rootSignature);
         efg.UpdateConstantBuffer(viewProjBuffer, &camera.viewProj, sizeof(camera.viewProj));
         efg.UpdateConstantBuffer(viewPosBuffer, &camera.eye, sizeof(camera.eye));
 
@@ -293,31 +296,33 @@ int main()
         efg.UpdateConstantBuffer(skybox_viewBuffer, &skybox_view, sizeof(skybox_view));
         efg.UpdateConstantBuffer(skybox_projBuffer, &camera.proj, sizeof(camera.proj));
 
-        efg.BindConstantBuffer(4, dirLightBuffer);
-
+        efg.SetPipelineState(shadowMapPSO);
+        efg.BindRootDescriptorTable(shadowMap_rootSignature);
+        efg.ClearDepthStencilView(shadowMap);
+        efg.SetRenderTarget(shadowMap);
+        efg.BindConstantBuffer(0, dirLightViewProj);
+        efg.BindStructuredBuffer(3, transformMatrixBuffer);
         efg.BindVertexBuffer(sphere.vertexBuffer);
         efg.BindIndexBuffer(sphere.indexBuffer);
-        efg.Bind2DTexture(6, texture);
         efg.BindConstantBuffer(1, sphere.transformBuffer);
         efg.BindConstantBuffer(2, sphere.constantsBuffer);
-        efg.BindConstantBuffer(3, materialBuffer);
         efg.DrawIndexedInstanced(square.indexCount, 1);
 
-        efg.Bind2DTexture(6, texture2);
         efg.BindConstantBuffer(2, sphereInstanced.constantsBuffer);
         efg.DrawIndexedInstanced(square.indexCount, 2000);
 
         for (size_t m = 0; m < mesh.materialBatches.size(); m++)
         {
             EfgInstanceBatch instances = mesh.materialBatches[m];
-            if(mesh.textures[m].diffuse_map.handle > 0)
-                efg.Bind2DTexture(6, mesh.textures[m].diffuse_map);
             efg.BindConstantBuffer(2, mesh.constantsBuffer);
-            efg.BindConstantBuffer(3, mesh.materialBuffers[m]);
             efg.BindVertexBuffer(instances.vertexBuffer);
             efg.BindIndexBuffer(instances.indexBuffer);
             efg.DrawIndexedInstanced(instances.indexCount);
         }
+
+        efg.SetPipelineState(pso);
+        efg.BindRootDescriptorTable(rootSignature);
+        efg.BindConstantBuffer(4, dirLightBuffer);
 
         efg.SetRenderTarget(colorBuffer, &depthBuffer);
         efg.ClearRenderTargetView(colorBuffer);
@@ -346,29 +351,7 @@ int main()
             efg.DrawIndexedInstanced(instances.indexCount);
         }
 
-        efg.SetPipelineState(shadowMapPSO);
-        efg.BindRootDescriptorTable(shadowMap_rootSignature);
-        efg.ClearDepthStencilView(shadowMap);
-        efg.SetRenderTarget(shadowMap);
-        efg.BindConstantBuffer(0, dirLightViewProj);
-        efg.BindStructuredBuffer(3, transformMatrixBuffer);
-        efg.BindVertexBuffer(sphere.vertexBuffer);
-        efg.BindIndexBuffer(sphere.indexBuffer);
-        efg.BindConstantBuffer(1, sphere.transformBuffer);
-        efg.BindConstantBuffer(2, sphere.constantsBuffer);
-        efg.DrawIndexedInstanced(square.indexCount, 1);
-
-        efg.BindConstantBuffer(2, sphereInstanced.constantsBuffer);
-        efg.DrawIndexedInstanced(square.indexCount, 2000);
-
-        for (size_t m = 0; m < mesh.materialBatches.size(); m++)
-        {
-            EfgInstanceBatch instances = mesh.materialBatches[m];
-            efg.BindConstantBuffer(2, mesh.constantsBuffer);
-            efg.BindVertexBuffer(instances.vertexBuffer);
-            efg.BindIndexBuffer(instances.indexBuffer);
-            efg.DrawIndexedInstanced(instances.indexCount);
-        }
+        efg.Copy2DTextureToBackbuffer(colorBuffer);
 
         //efg.SetPipelineState(skyboxPso);
         //efg.BindRootDescriptorTable(skybox_rootSignature);

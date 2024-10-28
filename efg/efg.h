@@ -209,6 +209,7 @@ public:
     EfgSampler CreateSampler();
     EfgTexture CreateShadowMap(uint32_t width, uint32_t height);
     EfgTexture CreateColorBuffer(uint32_t width, uint32_t height);
+    void Copy2DTextureToBackbuffer(EfgTexture);
     void ClearRenderTargetView(EfgTexture texture);
     void ClearDepthStencilView(EfgTexture texture);
     void CreateRootSignature(EfgRootSignature& rootSignature);

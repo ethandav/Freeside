@@ -25,11 +25,18 @@ enum EFG_CPU_ACCESS
     EFG_CPU_WRITE
 } EFG_CPU_ACCESS;
 
-struct EfgResource
+class EfgResource
 {
+public:
+    ID3D12Resource* Get() { return d3d12Resource.Get(); }
+    ComPtr<ID3D12Resource> Ptr() { return d3d12Resource; }
+    void Set(ComPtr<ID3D12Resource>resource) { d3d12Resource = resource; }
+
     uint32_t heapOffset = 0;
     uint32_t registerIndex = 0;
     D3D12_RESOURCE_STATES currState;
+private:
+    ComPtr<ID3D12Resource> d3d12Resource;
 };
 
 struct EfgBufferInternal : public EfgResource
@@ -37,7 +44,6 @@ struct EfgBufferInternal : public EfgResource
     EFG_BUFFER_TYPE type = {};
     UINT size = 0;
     UINT alignmentSize = 0;
-    ComPtr<ID3D12Resource> m_bufferResource;
 };
 
 struct EfgVertexBuffer : public EfgBufferInternal

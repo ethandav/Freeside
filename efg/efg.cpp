@@ -524,7 +524,7 @@ EfgResult EfgContext::CreateConstantBufferView(EfgConstantBuffer* buffer, uint32
         return EfgResult_InvalidOperation;
     }
     D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-    cbvDesc.BufferLocation = buffer->m_bufferResource->GetGPUVirtualAddress();
+    cbvDesc.BufferLocation = buffer->Get()->GetGPUVirtualAddress();
     cbvDesc.SizeInBytes = buffer->alignmentSize;
     buffer->heapOffset = heapOffset;
     buffer->cbvHandle = m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart();
@@ -547,7 +547,7 @@ EfgResult EfgContext::CreateStructuredBufferView(EfgStructuredBuffer* buffer, ui
     buffer->heapOffset = heapOffset;
     buffer->srvHandle = m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart();
     buffer->srvHandle.Offset(heapOffset, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
-    m_device->CreateShaderResourceView(buffer->m_bufferResource.Get(), &srvDesc, buffer->srvHandle);
+    m_device->CreateShaderResourceView(buffer->Get(), &srvDesc, buffer->srvHandle);
     return EfgResult_NoError;
 }
 
@@ -733,13 +733,13 @@ void EfgContext::CreateBuffer(void const* data, EfgBufferInternal& buffer, EFG_C
     {
     case EFG_CPU_NONE:
         uploadBuffer->Unmap(0, nullptr);
-        buffer.m_bufferResource = CreateBufferResource(cpuAccess, buffer.size);
-        CopyBuffer(buffer.m_bufferResource, uploadBuffer, buffer.alignmentSize, D3D12_RESOURCE_STATE_COMMON, finalState);
+        buffer.Set(CreateBufferResource(cpuAccess, buffer.size));
+        CopyBuffer(buffer.Get(), uploadBuffer, buffer.alignmentSize, D3D12_RESOURCE_STATE_COMMON, finalState);
         break;
     case EFG_CPU_WRITE:
         CD3DX12_RANGE writeRange(0, buffer.alignmentSize);
         uploadBuffer->Unmap(0, &writeRange);
-        buffer.m_bufferResource = uploadBuffer;
+        buffer.Set(uploadBuffer);
         break;
     }
 }
@@ -782,7 +782,7 @@ EfgVertexBuffer EfgContext::CreateVertexBuffer(void const* data, UINT size)
     buffer.type = EFG_VERTEX_BUFFER;
     CreateBuffer(data, buffer, EFG_CPU_NONE, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 
-    buffer.view.BufferLocation = buffer.m_bufferResource->GetGPUVirtualAddress();
+    buffer.view.BufferLocation = buffer.Get()->GetGPUVirtualAddress();
     buffer.view.StrideInBytes = sizeof(Vertex);
     buffer.view.SizeInBytes = buffer.size;
 
@@ -798,7 +798,7 @@ EfgIndexBuffer EfgContext::CreateIndexBuffer(void const* data, UINT size)
     buffer.type = EFG_INDEX_BUFFER;
     CreateBuffer(data, buffer, EFG_CPU_NONE, D3D12_RESOURCE_STATE_INDEX_BUFFER);
 
-    buffer.view.BufferLocation = buffer.m_bufferResource->GetGPUVirtualAddress();
+    buffer.view.BufferLocation = buffer.Get()->GetGPUVirtualAddress();
     buffer.view.Format = DXGI_FORMAT_R32_UINT;
     buffer.view.SizeInBytes = buffer.size;
 
@@ -1006,10 +1006,10 @@ void EfgContext::UpdateConstantBuffer(EfgBuffer& buffer, void const* data, UINT 
     void* mappedData = nullptr;
     D3D12_RANGE readRange = { 0, 0 };
     D3D12_RANGE writeRange = { 0, size };
-    bufferInternal->m_bufferResource->Map(0, &readRange, &mappedData);
+    bufferInternal->Get()->Map(0, &readRange, &mappedData);
     if (mappedData)
         memcpy(mappedData, data, (size_t)size);
-    bufferInternal->m_bufferResource->Unmap(0, &writeRange);
+    bufferInternal->Get()->Unmap(0, &writeRange);
 }
 
 void EfgContext::UpdateStructuredBuffer(EfgBuffer& buffer, void const* data, UINT size)
@@ -1018,10 +1018,10 @@ void EfgContext::UpdateStructuredBuffer(EfgBuffer& buffer, void const* data, UIN
     void* mappedData = nullptr;
     D3D12_RANGE readRange = { 0, 0 };
     D3D12_RANGE writeRange = { 0, size };
-    bufferInternal->m_bufferResource->Map(0, &readRange, &mappedData);
+    bufferInternal->Get()->Map(0, &readRange, &mappedData);
     if (mappedData)
         memcpy(mappedData, data, (size_t)size);
-    bufferInternal->m_bufferResource->Unmap(0, &writeRange);
+    bufferInternal->Get()->Unmap(0, &writeRange);
 }
 
 void EfgContext::WaitForGpu()
@@ -1234,13 +1234,13 @@ void EfgContext::Bind2DTexture(uint32_t index, const EfgTexture& texture)
 void EfgContext::BindConstantBuffer(uint32_t index, const EfgBuffer& buffer)
 {
     EfgBufferInternal* bufferInternal = reinterpret_cast<EfgBufferInternal*>(buffer.handle);
-    m_commandList->SetGraphicsRootConstantBufferView(index, bufferInternal->m_bufferResource.Get()->GetGPUVirtualAddress());
+    m_commandList->SetGraphicsRootConstantBufferView(index, bufferInternal->Get()->GetGPUVirtualAddress());
 }
 
 void EfgContext::BindStructuredBuffer(uint32_t index, const EfgBuffer& buffer)
 {
     EfgBufferInternal* bufferInternal = reinterpret_cast<EfgBufferInternal*>(buffer.handle);
-    m_commandList->SetGraphicsRootShaderResourceView(index, bufferInternal->m_bufferResource.Get()->GetGPUVirtualAddress());
+    m_commandList->SetGraphicsRootShaderResourceView(index, bufferInternal->Get()->GetGPUVirtualAddress());
 }
 
 void EfgContext::CompileShader(EfgShader& shader, LPCSTR entryPoint, LPCSTR target)

@@ -29,7 +29,7 @@ class EfgResource
 {
 public:
     ID3D12Resource* Get() { return d3d12Resource.Get(); }
-    ComPtr<ID3D12Resource> Ptr() { return d3d12Resource; }
+    ComPtr<ID3D12Resource>& Ptr() { return d3d12Resource; }
     void Set(ComPtr<ID3D12Resource>resource) { d3d12Resource = resource; }
 
     uint32_t heapOffset = 0;
@@ -79,7 +79,6 @@ struct EfgBuffer
 
 struct EfgTextureInternal : EfgResource
 {
-    ComPtr<ID3D12Resource> resource;
     DXGI_FORMAT format;
     D3D12_SHADER_RESOURCE_VIEW_DESC viewDesc = {};
     CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle = {};

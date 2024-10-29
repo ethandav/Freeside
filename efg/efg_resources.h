@@ -33,7 +33,6 @@ public:
     void Set(ComPtr<ID3D12Resource>resource) { d3d12Resource = resource; }
 
     uint32_t heapOffset = 0;
-    uint32_t registerIndex = 0;
     D3D12_RESOURCE_STATES currState;
 private:
     ComPtr<ID3D12Resource> d3d12Resource;

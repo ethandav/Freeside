@@ -91,7 +91,7 @@ struct EfgImportMesh
 {
     std::vector<EfgBuffer> materialBuffers;
     std::vector<EfgMaterialTextures> textures;
-    std::unordered_map<int, EfgInstanceBatch> materialBatches;
+    std::unordered_map<size_t, EfgInstanceBatch> materialBatches;
     ObjectConstants constants;
     EfgBuffer constantsBuffer;
 };
@@ -178,7 +178,7 @@ public:
             if (range.GetType() != data.heapType)
                 throw("Cannot mix heap types!");
         }
-        ranges.push_back(range.Commit(ranges.size()));
+        ranges.push_back(range.Commit((UINT)ranges.size()));
         data.descriptorSize += range.numDescriptors;
     };
     D3D12_ROOT_PARAMETER Commit(ShaderRegisters& registerIndex);
@@ -201,7 +201,7 @@ class EfgRootSignature
 {
 public:
     void insert(EfgRootParameter& parameter) {
-        parameter.data.index = (rootParameters.empty()) ? 0 : rootParameters.size();
+        parameter.data.index = (rootParameters.empty()) ? 0 : (UINT)rootParameters.size();
         rootParameters.push_back(parameter.Commit(registers));
         if(parameter.type == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
             descriptorTables.push_back(parameter);
@@ -306,9 +306,9 @@ private:
     void WaitForGpu();
 
     void CreateBuffer(void const* data, EfgBufferInternal& buffer, EFG_CPU_ACCESS cpuAccess, D3D12_RESOURCE_STATES finalState);
-    void CopyBuffer(ComPtr<ID3D12Resource> dest, ComPtr<ID3D12Resource> src, UINT size, D3D12_RESOURCE_STATES current, D3D12_RESOURCE_STATES final);
+    void CopyBuffer(EfgResource* dest, ComPtr<ID3D12Resource> src, UINT size, D3D12_RESOURCE_STATES current, D3D12_RESOURCE_STATES final);
     ComPtr<ID3D12Resource> CreateBufferResource(EFG_CPU_ACCESS cpuAccess, UINT size);
-    void TransitionResourceState(ComPtr<ID3D12Resource>& resource, D3D12_RESOURCE_STATES currentState, D3D12_RESOURCE_STATES newState);
+    void TransitionResourceState(EfgResource* resource, D3D12_RESOURCE_STATES currentState, D3D12_RESOURCE_STATES newState);
     EfgResult CreateCbvSrvDescriptorHeap(uint32_t numDescriptors);
     void CreateSamplerDescriptorHeap(uint32_t samplerCount);
     EfgResult CreateConstantBufferView(EfgConstantBuffer* buffer, uint32_t heapOffset);

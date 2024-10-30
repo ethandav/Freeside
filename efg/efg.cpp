@@ -310,12 +310,7 @@ EfgTexture EfgContext::CreateShadowMap(uint32_t width, uint32_t height)
     m_textures.push_back(textureInternal);
     m_textureCount++;
 
-    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
-        textureInternal->Get(),
-        D3D12_RESOURCE_STATE_GENERIC_READ,
-        D3D12_RESOURCE_STATE_DEPTH_WRITE
-    ));
-    textureInternal->currState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    TransitionResourceState(textureInternal, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
     return texture;
 }
@@ -365,12 +360,7 @@ EfgTexture EfgContext::CreateColorBuffer(uint32_t width, uint32_t height)
 
     m_renderTargets.push_back(textureInternal);
 
-    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
-        textureInternal->Get(),
-        D3D12_RESOURCE_STATE_GENERIC_READ,
-        D3D12_RESOURCE_STATE_RENDER_TARGET
-    ));
-    textureInternal->currState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    TransitionResourceState(textureInternal, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
     return texture;
 }
@@ -379,20 +369,13 @@ void EfgContext::Copy2DTextureToBackbuffer(EfgTexture texture)
 {
     EfgTextureInternal* textureInternal = reinterpret_cast<EfgTextureInternal*>(texture.handle);
     ComPtr<ID3D12Resource> backBuffer = m_backBuffers[m_frameIndex].Get();
-    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
-        textureInternal->Get(),
-        D3D12_RESOURCE_STATE_RENDER_TARGET,
-        D3D12_RESOURCE_STATE_COPY_SOURCE));
+    TransitionResourceState(textureInternal, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
         backBuffer.Get(),
         D3D12_RESOURCE_STATE_RENDER_TARGET,
         D3D12_RESOURCE_STATE_COPY_DEST));
     m_commandList->CopyResource(backBuffer.Get(), textureInternal->Get());
-
-    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
-        textureInternal->Get(),
-        D3D12_RESOURCE_STATE_COPY_SOURCE,
-        D3D12_RESOURCE_STATE_RENDER_TARGET));
+    TransitionResourceState(textureInternal, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
         backBuffer.Get(),
         D3D12_RESOURCE_STATE_COPY_DEST,
@@ -644,11 +627,7 @@ void EfgContext::DrawIndexedInstanced(uint32_t indexCount, uint32_t instanceCoun
 
 void EfgContext::Destroy()
 {
-    // Ensure that the GPU is no longer referencing resources that are about to be
-    // cleaned up by the destructor.
     WaitForPreviousFrame();
-
-    // Pipeline objects.
     m_swapChain.Reset();
     m_commandAllocator.Reset();
     m_commandQueue.Reset();
@@ -812,7 +791,7 @@ void EfgContext::CreateBuffer(void const* data, EfgBufferInternal& buffer, EFG_C
     case EFG_CPU_NONE:
         uploadBuffer->Unmap(0, nullptr);
         buffer.Set(CreateBufferResource(cpuAccess, buffer.size));
-        CopyBuffer(buffer.Get(), uploadBuffer, buffer.alignmentSize, D3D12_RESOURCE_STATE_COMMON, finalState);
+        CopyBuffer(&buffer, uploadBuffer, buffer.alignmentSize, D3D12_RESOURCE_STATE_COMMON, finalState);
         break;
     case EFG_CPU_WRITE:
         CD3DX12_RANGE writeRange(0, buffer.alignmentSize);
@@ -822,28 +801,30 @@ void EfgContext::CreateBuffer(void const* data, EfgBufferInternal& buffer, EFG_C
     }
 }
 
-void EfgContext::TransitionResourceState(ComPtr<ID3D12Resource>& resource, D3D12_RESOURCE_STATES currentState, D3D12_RESOURCE_STATES finalState)
+void EfgContext::TransitionResourceState(EfgResource* resource, D3D12_RESOURCE_STATES currentState, D3D12_RESOURCE_STATES finalState)
 {
     if (currentState != finalState)
     {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-        barrier.Transition.pResource = resource.Get();
+        barrier.Transition.pResource = resource->Get();
         barrier.Transition.StateBefore = currentState;
         barrier.Transition.StateAfter = finalState;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         
         m_commandList->ResourceBarrier(1, &barrier);
+
+        resource->currState = finalState;
     }
 }
 
-void EfgContext::CopyBuffer(ComPtr<ID3D12Resource> dest, ComPtr<ID3D12Resource> src, UINT size, D3D12_RESOURCE_STATES currentState, D3D12_RESOURCE_STATES finalState)
+void EfgContext::CopyBuffer(EfgResource* dest, ComPtr<ID3D12Resource> src, UINT size, D3D12_RESOURCE_STATES currentState, D3D12_RESOURCE_STATES finalState)
 {
     ResetCommandList();
     
     TransitionResourceState(dest, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
-    m_commandList->CopyBufferRegion(dest.Get(), 0, src.Get(), 0, size);
+    m_commandList->CopyBufferRegion(dest->Get(), 0, src.Get(), 0, size);
     TransitionResourceState(dest, D3D12_RESOURCE_STATE_COPY_DEST, finalState);
 
     ExecuteCommandList();
@@ -1281,7 +1262,7 @@ void EfgContext::ClearDepthStencilView(EfgTexture texture)
     EfgTextureInternal* textureInternal = reinterpret_cast<EfgTextureInternal*>(texture.handle);
     if (textureInternal->currState != D3D12_RESOURCE_STATE_DEPTH_WRITE)
     {
-        TransitionResourceState(textureInternal->Ptr(), textureInternal->currState, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+        TransitionResourceState(textureInternal, textureInternal->currState, D3D12_RESOURCE_STATE_DEPTH_WRITE);
         textureInternal->currState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
     }
     CD3DX12_CPU_DESCRIPTOR_HANDLE handle = {};
@@ -1320,7 +1301,7 @@ void EfgContext::Bind2DTexture(uint32_t index, const EfgTexture& texture)
     EfgTextureInternal* textureInternal = reinterpret_cast<EfgTextureInternal*>(texture.handle);
     if (textureInternal->currState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
     {
-        TransitionResourceState(textureInternal->Ptr(), textureInternal->currState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        TransitionResourceState(textureInternal, textureInternal->currState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         textureInternal->currState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     }
     CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), textureInternal->heapOffset, m_cbvSrvDescriptorSize);
@@ -1395,7 +1376,7 @@ void EfgContext::CheckD3DErrors()
     }
 }
 
-D3D12_DESCRIPTOR_RANGE EfgDescriptorRange::Commit(uint32_t offset)
+D3D12_DESCRIPTOR_RANGE EfgDescriptorRange::Commit(UINT offset)
 {
     D3D12_DESCRIPTOR_RANGE descriptorRange = {};
     switch (rangeType)
@@ -1623,7 +1604,7 @@ EfgImportMesh EfgContext::LoadFromObj(const char* basePath, const char* file)
           // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
           // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
           mesh.materialBatches[shapes[s].mesh.material_ids[f]].vertices.push_back(vertex);
-          mesh.materialBatches[shapes[s].mesh.material_ids[f]].indices.push_back(mesh.materialBatches[shapes[s].mesh.material_ids[f]].indices.size());
+          mesh.materialBatches[shapes[s].mesh.material_ids[f]].indices.push_back(static_cast<uint32_t>(mesh.materialBatches[shapes[s].mesh.material_ids[f]].indices.size()));
         }
         index_offset += fv;
       }
@@ -1632,9 +1613,9 @@ EfgImportMesh EfgContext::LoadFromObj(const char* basePath, const char* file)
       {
         if (mesh.materialBatches[m].vertices.size() > 0)
         {
-            mesh.materialBatches[m].vertexBuffer = CreateVertexBuffer<Vertex>(mesh.materialBatches[m].vertices.data(), mesh.materialBatches[m].vertices.size());
-            mesh.materialBatches[m].indexBuffer = CreateIndexBuffer<uint32_t>(mesh.materialBatches[m].indices.data(), mesh.materialBatches[m].indices.size());
-            mesh.materialBatches[m].indexCount = mesh.materialBatches[m].indices.size();
+            mesh.materialBatches[m].vertexBuffer = CreateVertexBuffer<Vertex>(mesh.materialBatches[m].vertices.data(), static_cast<uint32_t>(mesh.materialBatches[m].vertices.size()));
+            mesh.materialBatches[m].indexBuffer = CreateIndexBuffer<uint32_t>(mesh.materialBatches[m].indices.data(), static_cast<uint32_t>(mesh.materialBatches[m].indices.size()));
+            mesh.materialBatches[m].indexCount = static_cast<uint32_t>(mesh.materialBatches[m].indices.size());
         }
       }
     }

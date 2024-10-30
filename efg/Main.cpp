@@ -146,7 +146,7 @@ int main()
     DirectX::XMMATRIX lightViewProjMatrix = lightViewMatrix * lightProjMatrix;
 
     LightConstants lightData;
-    lightData.numPointLights = (uint32_t)pointLights.size();
+    lightData.numPointLights = (uint32_t)pointLights.size(); 
 
     EfgBuffer viewProjBuffer = efg.CreateConstantBuffer<XMMATRIX>(&camera.viewProj, 1);
     EfgBuffer viewPosBuffer = efg.CreateConstantBuffer<XMFLOAT3>(&camera.eye, 1);
@@ -281,12 +281,12 @@ int main()
     shadowMap_program.vertexShader = efg.CreateShader(L"shadowMap_vertex.hlsl", "vs_5_0");
     EfgPSO shadowMapPSO = efg.CreateShadowMapPSO(shadowMap_program, shadowMap_rootSignature);
 
-    float deltaTime = 0.0f;
-    float lastFrameTime = GetTimeInSeconds();
+    double deltaTime = 0.0f;
+    double lastFrameTime = GetTimeInSeconds();
 
     while (efgWindowIsRunning(efgWindow))
     {
-        float currentFrameTime = GetTimeInSeconds();
+        double currentFrameTime = GetTimeInSeconds();
         deltaTime = currentFrameTime - lastFrameTime;
         lastFrameTime = currentFrameTime;
 

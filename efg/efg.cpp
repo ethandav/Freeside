@@ -1300,7 +1300,7 @@ void EfgContext::CheckD3DErrors()
     }
 }
 
-D3D12_DESCRIPTOR_RANGE EfgDescriptorRange::Commit(bool useOffset = false)
+D3D12_DESCRIPTOR_RANGE EfgDescriptorRange::Commit(uint32_t offset)
 {
     D3D12_DESCRIPTOR_RANGE descriptorRange = {};
     switch (rangeType)
@@ -1318,7 +1318,7 @@ D3D12_DESCRIPTOR_RANGE EfgDescriptorRange::Commit(bool useOffset = false)
     descriptorRange.NumDescriptors = numDescriptors;
     descriptorRange.BaseShaderRegister = baseShaderRegister;
     descriptorRange.RegisterSpace = 0;
-    descriptorRange.OffsetInDescriptorsFromTableStart = useOffset ? offset : D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+    descriptorRange.OffsetInDescriptorsFromTableStart = offset;
     
     return descriptorRange;
 }

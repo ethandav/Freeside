@@ -107,15 +107,16 @@ public:
     template<typename TYPE> void insert(TYPE& efgResource) {
         EfgResource* resource = reinterpret_cast<EfgResource*>(efgResource.handle);
         if (numDescriptors == 0)
-            offset = resource->heapOffset;
-        if (resource->heapOffset < offset)
-            offset = resource->heapOffset;
+            heapOffset = resource->heapOffset;
+        if (resource->heapOffset < heapOffset)
+            heapOffset = resource->heapOffset;
         numDescriptors++;
     };
-    D3D12_DESCRIPTOR_RANGE Commit(bool useOffset);
+    D3D12_DESCRIPTOR_RANGE Commit(uint32_t rangeOffset);
 
     uint32_t numDescriptors = 0;
-    UINT offset = 0;
+    UINT heapOffset = 0;
+    UINT rangeOffset = 0;
 private:
     EFG_RANGE_TYPE rangeType;
     uint32_t baseShaderRegister = 0;
@@ -150,24 +151,21 @@ public:
     };
     void insert(EfgDescriptorRange& range) {
         bool useOffset = !ranges.empty();
-        if (useOffset && range.offset < data.offset) {
-            data.offset = range.offset;
+        if (useOffset && range.heapOffset < data.offset) {
+            data.offset = range.heapOffset;
         } else if (!useOffset) {
-            data.offset = range.offset;
+            data.offset = range.heapOffset;
         }
         ranges.push_back(range.Commit(useOffset));
-        data.size += range.numDescriptors;
     };
     D3D12_ROOT_PARAMETER Commit(ShaderRegisters& registerIndex);
 
     struct Data {
-        uint32_t size = 0;
         UINT offset = 0;
         bool conditionalBind = true;
     };
 
     D3D12_ROOT_PARAMETER_TYPE type;
-    uint32_t registerIndex = 0;
     Data data;
 
 private:

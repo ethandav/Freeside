@@ -205,8 +205,8 @@ void EfgContext::LoadPipeline()
         // Create a RTV for each frame.
         for (UINT n = 0; n < FrameCount; n++)
         {
-            EFG_D3D_TRY(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
-            m_device->CreateRenderTargetView(m_renderTargets[n].Get(), nullptr, rtvHandle);
+            EFG_D3D_TRY(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_backBuffers[n])));
+            m_device->CreateRenderTargetView(m_backBuffers[n].Get(), nullptr, rtvHandle);
             rtvHandle.Offset(1, m_rtvDescriptorSize);
         }
     }
@@ -256,6 +256,8 @@ EfgTexture EfgContext::CreateDepthBuffer(uint32_t width, uint32_t height)
     textureInternal->dsvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
     textureInternal->dsvHandle.Offset(m_dsvDescriptorCount, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
     m_dsvDescriptorCount++;
+
+    m_renderTargets.push_back(textureInternal);
 
     m_device->CreateDepthStencilView(textureInternal->Get(), &dsvDesc, textureInternal->dsvHandle);
 
@@ -361,6 +363,8 @@ EfgTexture EfgContext::CreateColorBuffer(uint32_t width, uint32_t height)
     rtvDesc.Texture2D.MipSlice = 0;
     m_device->CreateRenderTargetView(textureInternal->Get(), &rtvDesc, textureInternal->rtvHandle);
 
+    m_renderTargets.push_back(textureInternal);
+
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
         textureInternal->Get(),
         D3D12_RESOURCE_STATE_GENERIC_READ,
@@ -374,7 +378,7 @@ EfgTexture EfgContext::CreateColorBuffer(uint32_t width, uint32_t height)
 void EfgContext::Copy2DTextureToBackbuffer(EfgTexture texture)
 {
     EfgTextureInternal* textureInternal = reinterpret_cast<EfgTextureInternal*>(texture.handle);
-    ComPtr<ID3D12Resource> backBuffer = m_renderTargets[m_frameIndex].Get();
+    ComPtr<ID3D12Resource> backBuffer = m_backBuffers[m_frameIndex].Get();
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
         textureInternal->Get(),
         D3D12_RESOURCE_STATE_RENDER_TARGET,
@@ -448,7 +452,7 @@ void EfgContext::Frame()
     EFG_D3D_TRY(m_commandList->Reset(m_commandAllocator.Get(), m_boundPSO.pipelineState.Get()));
 
     // Indicate that the back buffer will be used as a render target.
-    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_backBuffers[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 
     //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_backBufferHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
@@ -469,7 +473,7 @@ void EfgContext::Frame()
 void EfgContext::Render()
 {
     // Indicate that the back buffer will now be used to present.
-    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_backBuffers[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
     ExecuteCommandList();
 
@@ -627,14 +631,14 @@ EfgResult EfgContext::CommitShaderResources()
 
 void EfgContext::DrawInstanced(uint32_t vertexCount)
 {
-    m_commandList->IASetVertexBuffers(0, 1, &m_boundVertexBuffer.view);
+    m_commandList->IASetVertexBuffers(0, 1, &m_boundVertexBuffer->view);
     m_commandList->DrawInstanced(vertexCount, 1, 0, 0);
 }
 
 void EfgContext::DrawIndexedInstanced(uint32_t indexCount, uint32_t instanceCount)
 {
-    m_commandList->IASetVertexBuffers(0, 1, &m_boundVertexBuffer.view);
-    m_commandList->IASetIndexBuffer(&m_boundIndexBuffer.view);
+    m_commandList->IASetVertexBuffers(0, 1, &m_boundVertexBuffer->view);
+    m_commandList->IASetIndexBuffer(&m_boundIndexBuffer->view);
     m_commandList->DrawIndexedInstanced(indexCount, instanceCount, 0, 0, 0);
 }
 
@@ -643,6 +647,49 @@ void EfgContext::Destroy()
     // Ensure that the GPU is no longer referencing resources that are about to be
     // cleaned up by the destructor.
     WaitForPreviousFrame();
+
+    // Pipeline objects.
+    m_swapChain.Reset();
+    m_commandAllocator.Reset();
+    m_commandQueue.Reset();
+    m_backBufferHeap.Reset();
+    m_rtvHeap.Reset();
+    m_cbvSrvHeap.Reset();
+    m_samplerHeap.Reset();
+    dsvHeap.Reset();
+    depthStencilBuffer.Reset();
+    m_commandList.Reset();
+    m_rootSignature.Reset();
+    m_fence.Reset();
+
+    for(int i = 0; i < FrameCount; ++i)
+        m_backBuffers[i].Reset();
+
+    for (auto buffer : m_constantBuffers)
+        buffer->Ptr().Reset();
+    for (auto buffer : m_structuredBuffers)
+        buffer->Ptr().Reset();
+    for (auto textures : m_textures)
+        textures->Ptr().Reset();
+    for (auto textures : m_textureCubes)
+        textures->Ptr().Reset();
+    for (auto samplers : m_samplers)
+        samplers->Ptr().Reset();
+    for (auto rootSignature : m_rootSignatures)
+        rootSignature->Destroy();
+    for (auto renderTarget : m_renderTargets)
+        renderTarget->Ptr().Reset();
+    for (auto indexBuffer : m_indexBuffers)
+        indexBuffer->Ptr().Reset();
+    for (auto vertexBuffer : m_vertexBuffers)
+        vertexBuffer->Ptr().Reset();
+
+    ComPtr<ID3D12DebugDevice> debugDevice;
+    if (SUCCEEDED(m_device.As(&debugDevice))) {
+        debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL);
+    }
+
+    m_device.Reset();
 
     CloseHandle(m_fenceEvent);
 }
@@ -773,34 +820,42 @@ void EfgContext::CopyBuffer(ComPtr<ID3D12Resource> dest, ComPtr<ID3D12Resource> 
 }
 
 
-EfgVertexBuffer EfgContext::CreateVertexBuffer(void const* data, UINT size)
+EfgBuffer EfgContext::CreateVertexBuffer(void const* data, UINT size)
 {
-    EfgVertexBuffer buffer = { };
+    EfgBuffer buffer = { };
+    EfgVertexBuffer* bufferInternal = new EfgVertexBuffer();
 
-    buffer.size = size;
-    buffer.alignmentSize = size;
-    buffer.type = EFG_VERTEX_BUFFER;
-    CreateBuffer(data, buffer, EFG_CPU_NONE, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+    buffer.handle = reinterpret_cast<uint64_t>(bufferInternal);
+    bufferInternal->size = size;
+    bufferInternal->alignmentSize = size;
+    bufferInternal->type = EFG_VERTEX_BUFFER;
+    CreateBuffer(data, *bufferInternal, EFG_CPU_NONE, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 
-    buffer.view.BufferLocation = buffer.Get()->GetGPUVirtualAddress();
-    buffer.view.StrideInBytes = sizeof(Vertex);
-    buffer.view.SizeInBytes = buffer.size;
+    bufferInternal->view.BufferLocation = bufferInternal->Get()->GetGPUVirtualAddress();
+    bufferInternal->view.StrideInBytes = sizeof(Vertex);
+    bufferInternal->view.SizeInBytes = bufferInternal->size;
+
+    m_vertexBuffers.push_back(bufferInternal);
 
     return buffer;
 }
 
-EfgIndexBuffer EfgContext::CreateIndexBuffer(void const* data, UINT size)
+EfgBuffer EfgContext::CreateIndexBuffer(void const* data, UINT size)
 {
-    EfgIndexBuffer buffer = { };
+    EfgBuffer buffer = { };
+    EfgIndexBuffer* bufferInternal = new EfgIndexBuffer();
 
-    buffer.size = size;
-    buffer.alignmentSize = size;
-    buffer.type = EFG_INDEX_BUFFER;
-    CreateBuffer(data, buffer, EFG_CPU_NONE, D3D12_RESOURCE_STATE_INDEX_BUFFER);
+    buffer.handle = reinterpret_cast<uint64_t>(bufferInternal);
+    bufferInternal->size = size;
+    bufferInternal->alignmentSize = size;
+    bufferInternal->type = EFG_INDEX_BUFFER;
+    CreateBuffer(data, *bufferInternal, EFG_CPU_NONE, D3D12_RESOURCE_STATE_INDEX_BUFFER);
 
-    buffer.view.BufferLocation = buffer.Get()->GetGPUVirtualAddress();
-    buffer.view.Format = DXGI_FORMAT_R32_UINT;
-    buffer.view.SizeInBytes = buffer.size;
+    bufferInternal->view.BufferLocation = bufferInternal->Get()->GetGPUVirtualAddress();
+    bufferInternal->view.Format = DXGI_FORMAT_R32_UINT;
+    bufferInternal->view.SizeInBytes = bufferInternal->size;
+
+    m_indexBuffers.push_back(bufferInternal);
 
     return buffer;
 }
@@ -1209,14 +1264,16 @@ void EfgContext::ClearRenderTargetView(EfgTexture texture)
     m_commandList->ClearRenderTargetView(textureInternal->rtvHandle, clearColor, 0, nullptr);
 }
 
-void EfgContext::BindVertexBuffer(EfgVertexBuffer buffer)
+void EfgContext::BindVertexBuffer(EfgBuffer buffer)
 {
-    m_boundVertexBuffer = buffer;
+    EfgVertexBuffer* bufferInternal = reinterpret_cast<EfgVertexBuffer*>(buffer.handle);
+    m_boundVertexBuffer = bufferInternal;
 }
 
-void EfgContext::BindIndexBuffer(EfgIndexBuffer buffer)
+void EfgContext::BindIndexBuffer(EfgBuffer buffer)
 {
-    m_boundIndexBuffer = buffer;
+    EfgIndexBuffer* bufferInternal = reinterpret_cast<EfgIndexBuffer*>(buffer.handle);
+    m_boundIndexBuffer = bufferInternal;
 }
 
 void EfgContext::Bind2DTexture(uint32_t index, const EfgTexture& texture)
@@ -1401,6 +1458,7 @@ void EfgContext::CreateRootSignature(EfgRootSignature& rootSignature)
 {
     ComPtr<ID3DBlob> serializedRootSignature = rootSignature.Serialize();
     ThrowIfFailed(m_device->CreateRootSignature(0, serializedRootSignature->GetBufferPointer(), serializedRootSignature->GetBufferSize(), IID_PPV_ARGS(&rootSignature.Get())));
+    m_rootSignatures.push_back(&rootSignature);
 }
 
 void EfgContext::BindRootDescriptorTable(EfgRootSignature& rootSignature)

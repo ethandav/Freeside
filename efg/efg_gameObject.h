@@ -31,8 +31,8 @@ public:
 	ObjectConstants constants;
 	Transform transform;
 	EfgMaterialBuffer material;
-	EfgVertexBuffer vertexBuffer;
-	EfgIndexBuffer indexBuffer;
+	EfgBuffer vertexBuffer;
+	EfgBuffer indexBuffer;
 	EfgBuffer transformBuffer;
 	EfgBuffer constantsBuffer;
 };

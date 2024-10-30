@@ -76,8 +76,8 @@ struct EfgProgram
 
 struct EfgInstanceBatch
 {
-    EfgVertexBuffer vertexBuffer = {};
-    EfgIndexBuffer indexBuffer = {};
+    EfgBuffer vertexBuffer = {};
+    EfgBuffer indexBuffer = {};
     uint32_t indexCount = 0;
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
@@ -132,7 +132,6 @@ public:
         {
         case 0:
             type = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-            data.conditionalBind = false;
             break;
         case 1:
             type = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
@@ -185,7 +184,6 @@ public:
         UINT index = 0;
         UINT descriptorSize = 0;
         D3D12_DESCRIPTOR_HEAP_TYPE heapType = {};
-        bool conditionalBind = true;
     };
 
     D3D12_ROOT_PARAMETER_TYPE type;
@@ -205,6 +203,7 @@ public:
             descriptorTables.push_back(parameter);
     };
     ComPtr<ID3DBlob> Serialize();
+    void Destroy() { rootSignature.Reset(); };
     ComPtr<ID3D12RootSignature>& Get() { return rootSignature; }
     std::vector<EfgRootParameter> descriptorTables = {};
     std::vector<D3D12_ROOT_PARAMETER> rootParameters = {};
@@ -218,8 +217,8 @@ class EfgContext
 {
 public:
 	void initialize(HWND window);
-    EfgVertexBuffer CreateVertexBuffer(void const* data, UINT size);
-    EfgIndexBuffer CreateIndexBuffer(void const* data, UINT size);
+    EfgBuffer CreateVertexBuffer(void const* data, UINT size);
+    EfgBuffer CreateIndexBuffer(void const* data, UINT size);
     EfgBuffer CreateConstantBuffer(void const* data, UINT size);
     EfgBuffer CreateStructuredBuffer(void const* data, UINT size, uint32_t numElements, size_t stride);
     EfgTexture CreateDepthBuffer(uint32_t width, uint32_t height);
@@ -236,8 +235,8 @@ public:
     void CreateRootSignature(EfgRootSignature& rootSignature);
     void UpdateConstantBuffer(EfgBuffer& buffer, void const* data, UINT size);
     void UpdateStructuredBuffer(EfgBuffer& buffer, void const* data, UINT size);
-    void BindVertexBuffer(EfgVertexBuffer buffer);
-    void BindIndexBuffer(EfgIndexBuffer buffer);
+    void BindVertexBuffer(EfgBuffer buffer);
+    void BindIndexBuffer(EfgBuffer buffer);
     void Bind2DTexture(uint32_t index, const EfgTexture& texture);
     void BindConstantBuffer(uint32_t index, const EfgBuffer& buffer);
     void BindStructuredBuffer(uint32_t index, const EfgBuffer& buffer);
@@ -258,16 +257,16 @@ public:
     void CheckD3DErrors();
 
     template<typename TYPE>
-    EfgVertexBuffer CreateVertexBuffer(void const* data, uint32_t count)
+    EfgBuffer CreateVertexBuffer(void const* data, uint32_t count)
     {
-        EfgVertexBuffer buffer = CreateVertexBuffer(data, count * sizeof(TYPE));
+        EfgBuffer buffer = CreateVertexBuffer(data, count * sizeof(TYPE));
         return buffer;
     }
     
     template<typename TYPE>
-    EfgIndexBuffer CreateIndexBuffer(void const* data, uint32_t count)
+    EfgBuffer CreateIndexBuffer(void const* data, uint32_t count)
     {
-        EfgIndexBuffer buffer = CreateIndexBuffer(data, count * sizeof(TYPE));
+        EfgBuffer buffer = CreateIndexBuffer(data, count * sizeof(TYPE));
         return buffer;
     }
     
@@ -327,7 +326,7 @@ private:
     CD3DX12_RECT m_scissorRect;
     ComPtr<IDXGISwapChain3> m_swapChain;
     ComPtr<ID3D12Device> m_device;
-    ComPtr<ID3D12Resource> m_renderTargets[FrameCount];
+    ComPtr<ID3D12Resource> m_backBuffers[FrameCount];
     ComPtr<ID3D12CommandAllocator> m_commandAllocator;
     ComPtr<ID3D12CommandQueue> m_commandQueue;
     ComPtr<ID3D12DescriptorHeap> m_backBufferHeap;
@@ -353,12 +352,15 @@ private:
     std::list<EfgTextureInternal*> m_textures = {};
     std::list<EfgTextureInternal*> m_textureCubes = {};
     std::list<EfgSamplerInternal*> m_samplers = {};
+    std::list<EfgRootSignature*> m_rootSignatures = {};
+    std::list<EfgTextureInternal*> m_renderTargets = {};
+    std::list<EfgBufferInternal*> m_indexBuffers = {};
+    std::list<EfgBufferInternal*> m_vertexBuffers = {};
 
     EfgPSO m_boundPSO = {};
-    EfgVertexBuffer m_boundVertexBuffer = {};
-    EfgIndexBuffer m_boundIndexBuffer = {};
+    EfgVertexBuffer* m_boundVertexBuffer = {};
+    EfgIndexBuffer* m_boundIndexBuffer = {};
     const EfgTexture* m_boundTexture = nullptr;
-
 
     // Synchronization objects.
     UINT m_frameIndex = 0;

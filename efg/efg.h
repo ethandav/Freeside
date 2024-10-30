@@ -113,6 +113,7 @@ public:
         numDescriptors++;
     };
     D3D12_DESCRIPTOR_RANGE Commit(uint32_t rangeOffset);
+    EFG_RANGE_TYPE GetType() { return rangeType; }
 
     uint32_t numDescriptors = 0;
     UINT heapOffset = 0;
@@ -156,12 +157,34 @@ public:
         } else if (!useOffset) {
             data.offset = range.heapOffset;
         }
-        ranges.push_back(range.Commit(useOffset));
+        if (ranges.empty())
+        {
+            switch (range.GetType())
+            {
+            case efgRange_CBV:
+            case efgRange_SRV:
+                data.heapType = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+                break;
+            case efgRange_SAMPLER:
+                data.heapType = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
+                break;
+            }
+        }
+        else
+        {
+            if (range.GetType() != data.heapType)
+                throw("Cannot mix heap types!");
+        }
+        ranges.push_back(range.Commit(ranges.size()));
+        data.descriptorSize += range.numDescriptors;
     };
     D3D12_ROOT_PARAMETER Commit(ShaderRegisters& registerIndex);
 
     struct Data {
         UINT offset = 0;
+        UINT index = 0;
+        UINT descriptorSize = 0;
+        D3D12_DESCRIPTOR_HEAP_TYPE heapType = {};
         bool conditionalBind = true;
     };
 
@@ -176,12 +199,14 @@ class EfgRootSignature
 {
 public:
     void insert(EfgRootParameter& parameter) {
+        parameter.data.index = (rootParameters.empty()) ? 0 : rootParameters.size();
         rootParameters.push_back(parameter.Commit(registers));
-        parameterData.push_back(parameter.data);
+        if(parameter.type == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
+            descriptorTables.push_back(parameter);
     };
     ComPtr<ID3DBlob> Serialize();
     ComPtr<ID3D12RootSignature>& Get() { return rootSignature; }
-    std::vector<EfgRootParameter::Data> parameterData = {};
+    std::vector<EfgRootParameter> descriptorTables = {};
     std::vector<D3D12_ROOT_PARAMETER> rootParameters = {};
 private:
     D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};

@@ -1407,28 +1407,25 @@ void EfgContext::BindRootDescriptorTable(EfgRootSignature& rootSignature)
 {
     uint32_t offset = 0;
     ComPtr<ID3D12DescriptorHeap> heap = {};
-    for (int i = 0; i < rootSignature.rootParameters.size(); i++)
+    for (int i = 0; i < rootSignature.descriptorTables.size(); i++)
     {
-        if (rootSignature.parameterData[i].conditionalBind)
-            continue;
-        offset = rootSignature.parameterData[i].offset;
         UINT descriptorSize = 0;
-        switch (rootSignature.rootParameters[i].DescriptorTable.pDescriptorRanges->RangeType)
+        offset = rootSignature.descriptorTables[i].data.offset;
+        switch (rootSignature.descriptorTables[i].data.heapType)
         {
-        case D3D12_DESCRIPTOR_RANGE_TYPE_CBV:
-        case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
-        case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
+        case D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV:
             heap = m_cbvSrvHeap;
             descriptorSize = m_cbvSrvDescriptorSize;
             break;
-        case D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER:
+        case D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER:
             offset = 0;
             heap = m_samplerHeap;
             descriptorSize = m_samplerDescriptorSize;
             break;
         }
+
         CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle(heap->GetGPUDescriptorHandleForHeapStart(), offset, descriptorSize);
-        m_commandList->SetGraphicsRootDescriptorTable(i, gpuHandle);
+        m_commandList->SetGraphicsRootDescriptorTable(rootSignature.descriptorTables[i].data.index, gpuHandle);
     }
 }
 

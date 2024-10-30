@@ -54,12 +54,16 @@ enum EFG_ROOT_PARAMETER_TYPE
     efgRootParamter_UAV
 };
 
-
-struct EfgPSO
+struct EfgPSOInternal
 {
     ComPtr<ID3D12RootSignature> rootSignature;
     ComPtr<ID3D12PipelineState> pipelineState;
     D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
+};
+
+struct EfgPSO
+{
+    uint64_t handle = 0;
 };
 
 struct EfgShader
@@ -356,8 +360,9 @@ private:
     std::list<EfgTextureInternal*> m_renderTargets = {};
     std::list<EfgBufferInternal*> m_indexBuffers = {};
     std::list<EfgBufferInternal*> m_vertexBuffers = {};
+    std::list<EfgPSOInternal*> m_pipelineStates = {};
 
-    EfgPSO m_boundPSO = {};
+    EfgPSOInternal* m_boundPSO = {};
     EfgVertexBuffer* m_boundVertexBuffer = {};
     EfgIndexBuffer* m_boundIndexBuffer = {};
     const EfgTexture* m_boundTexture = nullptr;

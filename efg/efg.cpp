@@ -449,7 +449,7 @@ void EfgContext::Frame()
     // However, when ExecuteCommandList() is called on a particular command 
     // list, that command list can then be reset at any time and must be before 
     // re-recording.
-    EFG_D3D_TRY(m_commandList->Reset(m_commandAllocator.Get(), m_boundPSO.pipelineState.Get()));
+    EFG_D3D_TRY(m_commandList->Reset(m_commandAllocator.Get(), nullptr));
 
     // Indicate that the back buffer will be used as a render target.
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_backBuffers[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
@@ -666,23 +666,54 @@ void EfgContext::Destroy()
         m_backBuffers[i].Reset();
 
     for (auto buffer : m_constantBuffers)
+    {
         buffer->Ptr().Reset();
+        delete buffer;
+    }
     for (auto buffer : m_structuredBuffers)
+    {
         buffer->Ptr().Reset();
-    for (auto textures : m_textures)
-        textures->Ptr().Reset();
-    for (auto textures : m_textureCubes)
-        textures->Ptr().Reset();
-    for (auto samplers : m_samplers)
-        samplers->Ptr().Reset();
+        delete buffer;
+    }
+    for (auto texture : m_textures)
+    {
+        texture->Ptr().Reset();
+        delete texture;
+    }
+    for (auto texture : m_textureCubes)
+    {
+        texture->Ptr().Reset();
+        delete texture;
+    }
+    for (auto sampler : m_samplers)
+    {
+        sampler->Ptr().Reset();
+        delete sampler;
+    }
     for (auto rootSignature : m_rootSignatures)
+    {
         rootSignature->Destroy();
+    }
     for (auto renderTarget : m_renderTargets)
+    {
         renderTarget->Ptr().Reset();
+    }
     for (auto indexBuffer : m_indexBuffers)
+    {
         indexBuffer->Ptr().Reset();
+        delete indexBuffer;
+    }
     for (auto vertexBuffer : m_vertexBuffers)
+    {
         vertexBuffer->Ptr().Reset();
+        delete vertexBuffer;
+    }
+    for (auto pso : m_pipelineStates)
+    {
+        pso->pipelineState.Reset();
+        pso->rootSignature.Reset();
+        delete pso;
+    }
 
     ComPtr<ID3D12DebugDevice> debugDevice;
     if (SUCCEEDED(m_device.As(&debugDevice))) {
@@ -1112,6 +1143,8 @@ EfgShader EfgContext::CreateShader(LPCWSTR fileName, LPCSTR target, LPCSTR entry
 EfgPSO EfgContext::CreateGraphicsPipelineState(EfgProgram program, EfgRootSignature& rootSignature)
 {
     EfgPSO pso = {};
+    EfgPSOInternal* psoInternal = new EfgPSOInternal();
+    pso.handle = reinterpret_cast<uint64_t>(psoInternal);
     D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
     {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -1120,7 +1153,7 @@ EfgPSO EfgContext::CreateGraphicsPipelineState(EfgProgram program, EfgRootSignat
         { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
     };
 
-    pso.rootSignature = rootSignature.Get();
+    psoInternal->rootSignature = rootSignature.Get();
 
     // Define the rasterizer state description
     D3D12_RASTERIZER_DESC rasterizerDesc = {};
@@ -1137,29 +1170,32 @@ EfgPSO EfgContext::CreateGraphicsPipelineState(EfgProgram program, EfgRootSignat
     rasterizerDesc.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
 
     // Describe and create the graphics pipeline state object (PSO).
-    pso.desc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
-    pso.desc.pRootSignature = rootSignature.Get().Get();
-    pso.desc.VS = CD3DX12_SHADER_BYTECODE(program.vertexShader.byteCode.Get());
-    pso.desc.PS = CD3DX12_SHADER_BYTECODE(program.pixelShader.byteCode.Get());
-    pso.desc.RasterizerState = rasterizerDesc;
-    pso.desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-    pso.desc.DepthStencilState.DepthEnable = TRUE;
-    pso.desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-    pso.desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
-    pso.desc.DepthStencilState.StencilEnable = FALSE;
-    pso.desc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-    pso.desc.SampleMask = UINT_MAX;
-    pso.desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    pso.desc.NumRenderTargets = 1;
-    pso.desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-    pso.desc.SampleDesc.Count = 1;
-    EFG_D3D_TRY(m_device->CreateGraphicsPipelineState(&pso.desc, IID_PPV_ARGS(&pso.pipelineState)));
+    psoInternal->desc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
+    psoInternal->desc.pRootSignature = rootSignature.Get().Get();
+    psoInternal->desc.VS = CD3DX12_SHADER_BYTECODE(program.vertexShader.byteCode.Get());
+    psoInternal->desc.PS = CD3DX12_SHADER_BYTECODE(program.pixelShader.byteCode.Get());
+    psoInternal->desc.RasterizerState = rasterizerDesc;
+    psoInternal->desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    psoInternal->desc.DepthStencilState.DepthEnable = TRUE;
+    psoInternal->desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+    psoInternal->desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+    psoInternal->desc.DepthStencilState.StencilEnable = FALSE;
+    psoInternal->desc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+    psoInternal->desc.SampleMask = UINT_MAX;
+    psoInternal->desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    psoInternal->desc.NumRenderTargets = 1;
+    psoInternal->desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+    psoInternal->desc.SampleDesc.Count = 1;
+    EFG_D3D_TRY(m_device->CreateGraphicsPipelineState(&psoInternal->desc, IID_PPV_ARGS(&psoInternal->pipelineState)));
+    m_pipelineStates.push_back(psoInternal);
     return pso;
 }
 
 EfgPSO EfgContext::CreateShadowMapPSO(EfgProgram program, EfgRootSignature rootSignature)
 {
     EfgPSO pso = {};
+    EfgPSOInternal* psoInternal = new EfgPSOInternal();
+    pso.handle = reinterpret_cast<uint64_t>(psoInternal);
     D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
     {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -1167,38 +1203,40 @@ EfgPSO EfgContext::CreateShadowMapPSO(EfgProgram program, EfgRootSignature rootS
         { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
     };
-    ZeroMemory(&pso.desc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
-    pso.rootSignature = rootSignature.Get();
-    pso.desc.pRootSignature = rootSignature.Get().Get();
-    pso.desc.VS = CD3DX12_SHADER_BYTECODE(program.vertexShader.byteCode.Get());
-    pso.desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-    pso.desc.SampleMask = UINT_MAX;
-    pso.desc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-    pso.desc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
-    pso.desc.RasterizerState.DepthBias = 1000;
-    pso.desc.RasterizerState.DepthBiasClamp = 0.0f;
-    pso.desc.RasterizerState.SlopeScaledDepthBias = 1.0f;
-    pso.desc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-    pso.desc.DepthStencilState.DepthEnable = TRUE;
-    pso.desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-    pso.desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
-    pso.desc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-    pso.desc.NumRenderTargets = 0;
-    pso.desc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
-    pso.desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    pso.desc.SampleDesc.Count = 1;
-    pso.desc.SampleDesc.Quality = 0;
-    EFG_D3D_TRY(m_device->CreateGraphicsPipelineState(&pso.desc, IID_PPV_ARGS(&pso.pipelineState)));
+    ZeroMemory(&psoInternal->desc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
+    psoInternal->rootSignature = rootSignature.Get();
+    psoInternal->desc.pRootSignature = rootSignature.Get().Get();
+    psoInternal->desc.VS = CD3DX12_SHADER_BYTECODE(program.vertexShader.byteCode.Get());
+    psoInternal->desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    psoInternal->desc.SampleMask = UINT_MAX;
+    psoInternal->desc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    psoInternal->desc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+    psoInternal->desc.RasterizerState.DepthBias = 1000;
+    psoInternal->desc.RasterizerState.DepthBiasClamp = 0.0f;
+    psoInternal->desc.RasterizerState.SlopeScaledDepthBias = 1.0f;
+    psoInternal->desc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    psoInternal->desc.DepthStencilState.DepthEnable = TRUE;
+    psoInternal->desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+    psoInternal->desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+    psoInternal->desc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+    psoInternal->desc.NumRenderTargets = 0;
+    psoInternal->desc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
+    psoInternal->desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    psoInternal->desc.SampleDesc.Count = 1;
+    psoInternal->desc.SampleDesc.Quality = 0;
+    EFG_D3D_TRY(m_device->CreateGraphicsPipelineState(&psoInternal->desc, IID_PPV_ARGS(&psoInternal->pipelineState)));
+    m_pipelineStates.push_back(psoInternal);
     return pso;
 }
 
 void EfgContext::SetPipelineState(EfgPSO pso)
 {
-    m_commandList->SetGraphicsRootSignature(pso.rootSignature.Get());
+    EfgPSOInternal* psoInternal = reinterpret_cast<EfgPSOInternal*>(pso.handle);
+    m_commandList->SetGraphicsRootSignature(psoInternal->rootSignature.Get());
     m_commandList->RSSetViewports(1, &m_viewport);
     m_commandList->RSSetScissorRects(1, &m_scissorRect);
-    m_commandList->SetPipelineState(pso.pipelineState.Get());
-    m_boundPSO = pso;
+    m_commandList->SetPipelineState(psoInternal->pipelineState.Get());
+    m_boundPSO = psoInternal;
 }
 
 void EfgContext::SetRenderTarget(EfgTexture texture, EfgTexture* depthStencil)

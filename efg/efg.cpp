@@ -307,6 +307,7 @@ EfgTexture EfgContext::CreateShadowMap(uint32_t width, uint32_t height)
     m_device->CreateDepthStencilView(textureInternal->Get(), &dsvDesc, textureInternal->dsvHandle);
 
     textureInternal->format = DXGI_FORMAT_R32_FLOAT;
+    textureInternal->currState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
     m_textures.push_back(textureInternal);
     m_textureCount++;
 
@@ -355,6 +356,8 @@ EfgTexture EfgContext::CreateColorBuffer(uint32_t width, uint32_t height)
     rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
     rtvDesc.Texture2D.MipSlice = 0;
     m_device->CreateRenderTargetView(textureInternal->Get(), &rtvDesc, textureInternal->rtvHandle);
+
+    textureInternal->currState = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
     m_renderTargets.push_back(textureInternal);
 
@@ -690,10 +693,10 @@ void EfgContext::Destroy()
         delete pso;
     }
 
-    ComPtr<ID3D12DebugDevice> debugDevice;
-    if (SUCCEEDED(m_device.As(&debugDevice))) {
-        debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL);
-    }
+    //ComPtr<ID3D12DebugDevice> debugDevice;
+    //if (SUCCEEDED(m_device.As(&debugDevice))) {
+    //    debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL);
+    //}
 
     m_device.Reset();
 

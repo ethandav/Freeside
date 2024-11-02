@@ -192,10 +192,6 @@ int main()
     // Must commit all resources before creating root signatures. This will pack all resources in the heap by type.
     efg.CommitShaderResources();
 
-    efg.ExecuteCommandList();
-    efg.WaitForGpu();
-    efg.OpenCommandList();
-
     // Skybox Root Signature
     EfgDescriptorRange skybox_range_CBV = EfgDescriptorRange(efgRange_CBV, 0);
     skybox_range_CBV.insert(skybox_viewBuffer);

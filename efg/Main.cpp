@@ -82,6 +82,8 @@ int main()
     uint32_t windowWidth = windowRect.right - windowRect.left;
     uint32_t windowHeight = windowRect.bottom - windowRect.top;
 
+    efg.OpenCommandList();
+
     EfgTexture depthBuffer = efg.CreateDepthBuffer(windowWidth,windowHeight);
     EfgTexture colorBuffer = efg.CreateColorBuffer(windowWidth,windowHeight);
     EfgTexture shadowMap = efg.CreateShadowMap(2048,2048);
@@ -190,6 +192,10 @@ int main()
     // Must commit all resources before creating root signatures. This will pack all resources in the heap by type.
     efg.CommitShaderResources();
 
+    efg.ExecuteCommandList();
+    efg.WaitForGpu();
+    efg.OpenCommandList();
+
     // Skybox Root Signature
     EfgDescriptorRange skybox_range_CBV = EfgDescriptorRange(efgRange_CBV, 0);
     skybox_range_CBV.insert(skybox_viewBuffer);
@@ -283,6 +289,9 @@ int main()
 
     double deltaTime = 0.0f;
     double lastFrameTime = GetTimeInSeconds();
+
+    efg.ExecuteCommandList();
+    efg.WaitForGpu();
 
     while (efgWindowIsRunning(efgWindow))
     {

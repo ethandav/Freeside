@@ -257,6 +257,9 @@ public:
     EfgImportMesh LoadFromObj(const char* basePath, const char* file);
     void Frame();
     void Render();
+    void OpenCommandList();
+    void ExecuteCommandList();
+    void WaitForGpu();
     void Destroy();
     void CheckD3DErrors();
 
@@ -301,9 +304,6 @@ private:
     void CompileShader(EfgShader& shader, LPCSTR entryPoint, LPCSTR target);
     ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type);
 
-    void ResetCommandList();
-    void ExecuteCommandList();
-    void WaitForGpu();
 
     void CreateBuffer(void const* data, EfgBufferInternal& buffer, EFG_CPU_ACCESS cpuAccess, D3D12_RESOURCE_STATES finalState);
     void CopyBuffer(EfgResource* dest, ComPtr<ID3D12Resource> src, UINT size, D3D12_RESOURCE_STATES current, D3D12_RESOURCE_STATES final);

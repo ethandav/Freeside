@@ -310,8 +310,6 @@ EfgTexture EfgContext::CreateShadowMap(uint32_t width, uint32_t height)
     m_textures.push_back(textureInternal);
     m_textureCount++;
 
-    TransitionResourceState(textureInternal, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-
     return texture;
 }
 
@@ -359,8 +357,6 @@ EfgTexture EfgContext::CreateColorBuffer(uint32_t width, uint32_t height)
     m_device->CreateRenderTargetView(textureInternal->Get(), &rtvDesc, textureInternal->rtvHandle);
 
     m_renderTargets.push_back(textureInternal);
-
-    TransitionResourceState(textureInternal, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
     return texture;
 }
@@ -821,14 +817,15 @@ void EfgContext::TransitionResourceState(EfgResource* resource, D3D12_RESOURCE_S
 
 void EfgContext::CopyBuffer(EfgResource* dest, ComPtr<ID3D12Resource> src, UINT size, D3D12_RESOURCE_STATES currentState, D3D12_RESOURCE_STATES finalState)
 {
-    ResetCommandList();
-    
+    ExecuteCommandList();
+    WaitForGpu();
+    OpenCommandList();
     TransitionResourceState(dest, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
     m_commandList->CopyBufferRegion(dest->Get(), 0, src.Get(), 0, size);
     TransitionResourceState(dest, D3D12_RESOURCE_STATE_COPY_DEST, finalState);
-
     ExecuteCommandList();
     WaitForGpu();
+    OpenCommandList();
 }
 
 
@@ -986,7 +983,9 @@ EfgTexture EfgContext::CreateTextureCube(const std::vector<std::wstring>& filena
     auto uploadResourcesFinished = resourceUpload.End(m_commandQueue.Get());
     uploadResourcesFinished.wait();
 
-    ResetCommandList();
+    ExecuteCommandList();
+    WaitForGpu();
+    OpenCommandList();
 
     for (int i = 0; i < 6; ++i) {
         // Transition the resource state to COPY_SOURCE
@@ -1019,6 +1018,7 @@ EfgTexture EfgContext::CreateTextureCube(const std::vector<std::wstring>& filena
 
     ExecuteCommandList();
     WaitForGpu();
+    OpenCommandList();
 
     texture.index = m_textureCount;
     m_textureCubes.push_back(textureInternal);
@@ -1107,7 +1107,7 @@ void EfgContext::WaitForGpu()
     }
 }
 
-void EfgContext::ResetCommandList()
+void EfgContext::OpenCommandList()
 {
     EFG_D3D_TRY(m_commandAllocator->Reset());
     EFG_D3D_TRY(m_commandList->Reset(m_commandAllocator.Get(), nullptr));

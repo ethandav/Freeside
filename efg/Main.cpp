@@ -75,7 +75,7 @@ int main()
     EfgWindow efgWindow = efgCreateWindow(1920, 1080, L"New Window");
     EfgContext efg;
     efg.initialize(efgWindow);
-    Camera camera = efgCreateCamera(efg, DirectX::XMFLOAT3(0.0f, 5.0f, 5.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f));
+    Camera camera = efgCreateCamera(efg, DirectX::XMFLOAT3(0.0f, 5.0f, -5.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f));
 
     RECT windowRect = {};
     GetClientRect(efgWindow, &windowRect);
@@ -87,6 +87,7 @@ int main()
     EfgTexture depthBuffer = efg.CreateDepthBuffer(windowWidth,windowHeight);
     EfgTexture colorBuffer = efg.CreateColorBuffer(windowWidth,windowHeight);
     EfgTexture shadowMap = efg.CreateShadowMap(2048,2048);
+    EfgTexture cubeShadowMap = efg.CreateCubeShadowMap(2048,2048);
 
     Shape square = Shapes::getShape(Shapes::SPHERE);
 	std::mt19937 rng(std::random_device{}());
@@ -114,34 +115,77 @@ int main()
     sphere.material.shininess = 32.0f;
     sphere.material.diffuseMapFlag = true;
     EfgBuffer materialBuffer = efg.CreateConstantBuffer<EfgMaterialBuffer>(&sphere.material, 1);
-    sphere.transform.translation = XMFLOAT3(2.0f, 0.5f, 0.0f);
+    sphere.transform.translation = XMFLOAT3(1.5f, 0.5f, 0.0f);
     sphere.transform.scale = XMFLOAT3(1.0f, 1.0f, 1.0f);
     sphere.transform.rotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
     sphere.constantsBuffer = efg.CreateConstantBuffer<ObjectConstants>(&sphere.constants, 1);
     sphere.transformBuffer = efg.CreateConstantBuffer<XMMATRIX>(&sphere.transform.GetTransformMatrix(), 1);
 
+    GameObject cube;
+    Shape cubeShape = Shapes::getShape(Shapes::CUBE);
+    cube.constants.useTransform = true;
+    cube.vertexBuffer = efg.CreateVertexBuffer<Vertex>(cubeShape.vertices.data(), cubeShape.vertexCount);
+    cube.indexBuffer = efg.CreateIndexBuffer<uint32_t>(cubeShape.indices.data(), cubeShape.indexCount);
+    cube.material.ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 0.0f);
+    cube.material.diffuse = XMFLOAT4(0.5f, 0.5f, 0.5f, 0.0f);
+    cube.material.ambient = XMFLOAT4(0.5f, 0.5f, 0.5f, 0.0f);
+    cube.material.specular = XMFLOAT4(0.2f, 0.2f, 0.2f, 0.0f);
+    cube.material.shininess = 32.0f;
+    cube.material.diffuseMapFlag = true;
+    EfgBuffer cubeMaterialBuffer = efg.CreateConstantBuffer<EfgMaterialBuffer>(&cube.material, 1);
+    cube.transform.translation = XMFLOAT3(0.0f, 5.5f, -2.0f);
+    cube.transform.scale = XMFLOAT3(1.0f, 1.0f, 1.0f);
+    cube.transform.rotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    cube.constantsBuffer = efg.CreateConstantBuffer<ObjectConstants>(&cube.constants, 1);
+    cube.transformBuffer = efg.CreateConstantBuffer<XMMATRIX>(&cube.transform.GetTransformMatrix(), 1);
+
     std::vector<PointLightBuffer> pointLights(1);
-    pointLights[0].position = XMFLOAT4(1000.0f, 1000.0f, 1000.0f, 0.0f);
-    pointLights[0].color = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.0f);
+    pointLights[0].position = XMFLOAT4(0.0f, 5.0f, 0.0f, 0.0f);
+    pointLights[0].color = XMFLOAT4(0.8f, 0.8f, 0.8f, 0.0f);
+    pointLights[0].attenuation = XMFLOAT4(1.0, 0.09, 0.032, 0.0f);
+    XMVECTOR lightPos = XMLoadFloat4(&pointLights[0].position);
+    DirectX::XMMATRIX PL_shadowViewMatrices[6] = {
+        DirectX::XMMatrixLookAtLH(lightPos, lightPos + DirectX::XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)),  // +X good
+        DirectX::XMMatrixLookAtLH(lightPos, lightPos + DirectX::XMVectorSet(-1.0f, 0.0f, 0.0f, 0.0f), DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)), // -X good
+        DirectX::XMMatrixLookAtLH(lightPos, lightPos + DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), DirectX::XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f)),  // +Y good
+        DirectX::XMMatrixLookAtLH(lightPos, lightPos + DirectX::XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f), DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f)), // -Y good
+        DirectX::XMMatrixLookAtLH(lightPos, lightPos + DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)),  // +Z good
+        DirectX::XMMatrixLookAtLH(lightPos, lightPos + DirectX::XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f), DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f))  // -Z good
+    };
+    float nearPlane = 4.0f;
+    float farPlane = 10.0f;
+    XMMATRIX PL_projMatrix = XMMatrixPerspectiveFovLH(XM_PIDIV2, 1.0f, nearPlane, farPlane);
+    std::vector<EfgBuffer> pl_viewProjBuffers = {};
+    pl_viewProjBuffers.reserve(6);
+    for(int i = 0; i < 6; i++)
+        pl_viewProjBuffers.push_back(efg.CreateConstantBuffer<XMMATRIX>(&(XMMatrixMultiply(PL_shadowViewMatrices[i], PL_projMatrix)), 1));
+
 
     DirLightBuffer dirLight;
-    dirLight.direction = XMFLOAT4(0.0f, -1.0f, -0.3f, 0.0f);
+    dirLight.direction = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
     dirLight.ambient = XMFLOAT4(0.05f, 0.05f, 0.05f, 0.0f);
     dirLight.diffuse = XMFLOAT4(0.4f, 0.4f, 0.4f, 0.0f);
     dirLight.specular = XMFLOAT4(0.5f, 0.5f, 0.5f, 0.0f);
 
     // Position and look-at for the light
-    DirectX::XMVECTOR lightPosition = DirectX::XMVectorSet(-10.0f, 10.0f, 0.0f, 1.0f); // Position above the plane
+    DirectX::XMVECTOR lightPosition = DirectX::XMVectorSet(20.0f, 10.0f, 0.0f, 1.0f); // Position above the plane
     DirectX::XMVECTOR lightTarget = DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f); // Center of the scene
     DirectX::XMVECTOR lightUp = DirectX::XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f);    // Up direction for downward view
     
+    // Calculate the direction vector from position to target
+    DirectX::XMVECTOR lightDirectionVector = DirectX::XMVectorSubtract(lightTarget, lightPosition);
+    lightDirectionVector = DirectX::XMVector3Normalize(lightDirectionVector);
+    
+    // Store the direction in dirLight (assuming it’s in float4 format)
+    DirectX::XMStoreFloat4(&dirLight.direction, lightDirectionVector);
+
     DirectX::XMMATRIX lightViewMatrix = DirectX::XMMatrixLookAtLH(lightPosition, lightTarget, lightUp);
     
     // Ortho projection to cover the scene dimensions
     float orthoWidth = 20.0f; // Match scene size in X
     float orthoHeight = 20.0f; // Match scene size in Z
-    float nearZ = 1.0f;
-    float farZ = 40.0f;
+    float nearZ = 15.0f;
+    float farZ = 35.0f;
     DirectX::XMMATRIX lightProjMatrix = DirectX::XMMatrixOrthographicLH(orthoWidth, orthoHeight, nearZ, farZ);
     
     // Combine view and projection for shadow mapping
@@ -154,6 +198,7 @@ int main()
     EfgBuffer viewPosBuffer = efg.CreateConstantBuffer<XMFLOAT3>(&camera.eye, 1);
     EfgBuffer lightDataBuffer = efg.CreateConstantBuffer<PointLightBuffer>(&lightData, 1);
     EfgBuffer dirLightViewProj = efg.CreateConstantBuffer<XMMATRIX>(&lightViewProjMatrix, 1);
+    //EfgBuffer dirLightViewProj = efg.CreateConstantBuffer<XMMATRIX>(&testMat, 1);
     EfgBuffer pointLightBuffer = efg.CreateStructuredBuffer<PointLightBuffer>(pointLights.data(), (uint32_t)pointLights.size());
     EfgBuffer dirLightBuffer = efg.CreateConstantBuffer<DirLightBuffer>(&dirLight, 1);
     EfgBuffer transformMatrixBuffer = efg.CreateStructuredBuffer<XMMATRIX>(transformMatrices.data(), (uint32_t)transformMatrices.size());
@@ -163,6 +208,7 @@ int main()
 
     EfgSampler sampler = efg.CreateTextureSampler();
     EfgSampler depthSampler = efg.CreateDepthSampler();
+    EfgSampler depthCubeSampler = efg.CreateDepthCubeSampler();
 
     //EfgImportMesh mesh = efg.LoadFromObj("C:\\Users\\Ethan\\Documents\\sibenik", "C:\\Users\\Ethan\\Documents\\sibenik\\sibenik.obj");
     EfgImportMesh mesh = efg.LoadFromObj(nullptr, "C:\\Users\\Ethan\\Documents\\FreesideEngineTestAssets\\donut\\donut.obj");
@@ -221,18 +267,16 @@ int main()
     range.insert(viewPosBuffer);
     range.insert(lightDataBuffer);
     range.insert(dirLightViewProj);
-
     EfgDescriptorRange rangeSrv = EfgDescriptorRange(efgRange_SRV, 0);
     rangeSrv.insert(pointLightBuffer);
     rangeSrv.insert(transformMatrixBuffer);
-
     EfgDescriptorRange rangeTex = EfgDescriptorRange(efgRange_SRV, 2, 1);
     EfgDescriptorRange rangeShadowMap = EfgDescriptorRange(efgRange_SRV, 3, 1);
-
+    EfgDescriptorRange rangeShadowCubeMap = EfgDescriptorRange(efgRange_SRV, 4, 1);
     EfgDescriptorRange rangeSampler = EfgDescriptorRange(efgRange_SAMPLER, 0);
     rangeSampler.insert(sampler);
     rangeSampler.insert(depthSampler);
-
+    rangeSampler.insert(depthCubeSampler);
     EfgRootParameter rootParameter0(efgRootParamter_DESCRIPTOR_TABLE);
     rootParameter0.insert(range);
     EfgRootParameter rootParameter1(efgRootParameter_CBV); // Transform
@@ -243,13 +287,12 @@ int main()
     rootParameter4.insert(rangeSrv);
     EfgRootParameter rootParameter5(efgRootParamter_DESCRIPTOR_TABLE); // Texture
     rootParameter5.insert(rangeTex);
-
     EfgRootParameter rootParameter6(efgRootParamter_DESCRIPTOR_TABLE);
     rootParameter6.insert(rangeSampler);
-
     EfgRootParameter rootParameter7(efgRootParamter_DESCRIPTOR_TABLE);
     rootParameter7.insert(rangeShadowMap);
-
+    EfgRootParameter rootParameter8(efgRootParamter_DESCRIPTOR_TABLE);
+    rootParameter8.insert(rangeShadowCubeMap);
     EfgRootSignature rootSignature;
     rootSignature.insert(rootParameter0);
     rootSignature.insert(rootParameter1);
@@ -260,6 +303,7 @@ int main()
     rootSignature.insert(rootParameter5);
     rootSignature.insert(rootParameter6);
     rootSignature.insert(rootParameter7);
+    rootSignature.insert(rootParameter8);
     efg.CreateRootSignature(rootSignature);
 
     EfgRootParameter shadowMap_rootParameter0(efgRootParameter_CBV);
@@ -309,62 +353,116 @@ int main()
         efg.UpdateConstantBuffer(skybox_viewBuffer, &skybox_view, sizeof(skybox_view));
         efg.UpdateConstantBuffer(skybox_projBuffer, &camera.proj, sizeof(camera.proj));
 
-        efg.SetPipelineState(shadowMapPSO);
-        efg.BindRootDescriptorTable(shadowMap_rootSignature);
-        efg.ClearDepthStencilView(shadowMap);
-        efg.SetRenderTarget(shadowMap);
-        efg.SetRenderTargetResolution(2048, 2048);
-        efg.BindConstantBuffer(0, dirLightViewProj);
-        efg.BindStructuredBuffer(3, transformMatrixBuffer);
-
-        efg.BindVertexBuffer(sphere.vertexBuffer);
-        efg.BindIndexBuffer(sphere.indexBuffer);
-        efg.BindConstantBuffer(1, sphere.transformBuffer);
-        efg.BindConstantBuffer(2, sphere.constantsBuffer);
-        efg.DrawIndexedInstanced(square.indexCount, 1);
-
-        //efg.BindConstantBuffer(2, sphereInstanced.constantsBuffer);
-        //efg.DrawIndexedInstanced(square.indexCount, 2000);
-
-        for (size_t m = 0; m < mesh.materialBatches.size(); m++)
+        // Shadow Maps
         {
-            EfgInstanceBatch instances = mesh.materialBatches[m];
-            efg.BindConstantBuffer(2, mesh.constantsBuffer);
-            efg.BindVertexBuffer(instances.vertexBuffer);
-            efg.BindIndexBuffer(instances.indexBuffer);
-            efg.DrawIndexedInstanced(instances.indexCount);
+            // Dir Light Shadow map
+            {
+                efg.SetPipelineState(shadowMapPSO);
+                efg.BindRootDescriptorTable(shadowMap_rootSignature);
+                efg.ClearDepthStencilView(shadowMap);
+                efg.SetRenderTarget(shadowMap);
+                efg.SetRenderTargetResolution(2048, 2048);
+                efg.BindConstantBuffer(0, dirLightViewProj);
+                efg.BindStructuredBuffer(3, transformMatrixBuffer);
+
+                efg.BindVertexBuffer(sphere.vertexBuffer);
+                efg.BindIndexBuffer(sphere.indexBuffer);
+                efg.BindConstantBuffer(1, sphere.transformBuffer);
+                efg.BindConstantBuffer(2, sphere.constantsBuffer);
+                efg.DrawIndexedInstanced(square.indexCount, 1);
+
+                //efg.BindConstantBuffer(2, sphereInstanced.constantsBuffer);
+                //efg.DrawIndexedInstanced(square.indexCount, 2000);
+
+                for (size_t m = 0; m < mesh.materialBatches.size(); m++)
+                {
+                    EfgInstanceBatch instances = mesh.materialBatches[m];
+                    efg.BindConstantBuffer(2, mesh.constantsBuffer);
+                    efg.BindVertexBuffer(instances.vertexBuffer);
+                    efg.BindIndexBuffer(instances.indexBuffer);
+                    efg.DrawIndexedInstanced(instances.indexCount);
+                }
+            }
+
+            // Point Light Shadow map
+            {
+                efg.ClearDepthStencilView(cubeShadowMap);
+                efg.SetRenderTargetResolution(2048, 2048);
+                for (int i = 0; i < 6; i++)
+                {
+                    efg.SetRenderTarget(cubeShadowMap, i);
+                    efg.BindConstantBuffer(0, pl_viewProjBuffers[i]);
+
+                    efg.BindVertexBuffer(sphere.vertexBuffer);
+                    efg.BindIndexBuffer(sphere.indexBuffer);
+                    efg.BindConstantBuffer(1, sphere.transformBuffer);
+                    efg.BindConstantBuffer(2, sphere.constantsBuffer);
+                    efg.DrawIndexedInstanced(square.indexCount, 1);
+
+                    efg.BindVertexBuffer(cube.vertexBuffer);
+                    efg.BindIndexBuffer(cube.indexBuffer);
+                    efg.BindConstantBuffer(1, cube.transformBuffer);
+                    efg.BindConstantBuffer(2, cube.constantsBuffer);
+                    efg.DrawIndexedInstanced(cubeShape.indexCount, 1);
+
+                    //efg.BindConstantBuffer(2, sphereInstanced.constantsBuffer);
+                    //efg.DrawIndexedInstanced(square.indexCount, 2000);
+
+                    for (size_t m = 0; m < mesh.materialBatches.size(); m++)
+                    {
+                        EfgInstanceBatch instances = mesh.materialBatches[m];
+                        efg.BindConstantBuffer(2, mesh.constantsBuffer);
+                        efg.BindVertexBuffer(instances.vertexBuffer);
+                        efg.BindIndexBuffer(instances.indexBuffer);
+                        efg.DrawIndexedInstanced(instances.indexCount);
+                    }
+                }
+            }
         }
 
-        efg.SetPipelineState(pso);
-        efg.BindRootDescriptorTable(rootSignature);
-        efg.BindConstantBuffer(4, dirLightBuffer);
-        efg.Bind2DTexture(8, shadowMap);
-
-        efg.SetRenderTarget(colorBuffer, &depthBuffer);
-        efg.SetRenderTargetResolution(1920, 1080);
-        efg.ClearRenderTargetView(colorBuffer);
-        efg.ClearDepthStencilView(depthBuffer);
-        efg.BindVertexBuffer(sphere.vertexBuffer);
-        efg.BindIndexBuffer(sphere.indexBuffer);
-        efg.Bind2DTexture(6, texture);
-        efg.BindConstantBuffer(1, sphere.transformBuffer);
-        efg.BindConstantBuffer(2, sphere.constantsBuffer);
-        efg.BindConstantBuffer(3, materialBuffer);
-        efg.DrawIndexedInstanced(square.indexCount, 1);
-
-        //efg.BindConstantBuffer(2, sphereInstanced.constantsBuffer);
-        //efg.DrawIndexedInstanced(square.indexCount, 2000);
-
-        for (size_t m = 0; m < mesh.materialBatches.size(); m++)
+        // Main color render pass
         {
-            EfgInstanceBatch instances = mesh.materialBatches[m];
-            if(mesh.textures[m].diffuse_map.handle > 0)
-                efg.Bind2DTexture(6, mesh.textures[m].diffuse_map);
-            efg.BindConstantBuffer(2, mesh.constantsBuffer);
-            efg.BindConstantBuffer(3, mesh.materialBuffers[m]);
-            efg.BindVertexBuffer(instances.vertexBuffer);
-            efg.BindIndexBuffer(instances.indexBuffer);
-            efg.DrawIndexedInstanced(instances.indexCount);
+            efg.SetPipelineState(pso);
+            efg.BindRootDescriptorTable(rootSignature);
+            efg.BindConstantBuffer(4, dirLightBuffer);
+            efg.Bind2DTexture(8, shadowMap);
+            efg.Bind2DTexture(9, cubeShadowMap);
+
+            efg.SetRenderTarget(colorBuffer, 0, &depthBuffer);
+            efg.SetRenderTargetResolution(1920, 1080);
+            efg.ClearRenderTargetView(colorBuffer);
+            efg.ClearDepthStencilView(depthBuffer);
+
+            efg.BindVertexBuffer(sphere.vertexBuffer);
+            efg.BindIndexBuffer(sphere.indexBuffer);
+            efg.Bind2DTexture(6, texture);
+            efg.BindConstantBuffer(1, sphere.transformBuffer);
+            efg.BindConstantBuffer(2, sphere.constantsBuffer);
+            efg.BindConstantBuffer(3, materialBuffer);
+            efg.DrawIndexedInstanced(square.indexCount, 1);
+
+            efg.BindVertexBuffer(cube.vertexBuffer);
+            efg.BindIndexBuffer(cube.indexBuffer);
+            efg.Bind2DTexture(6, texture);
+            efg.BindConstantBuffer(1, cube.transformBuffer);
+            efg.BindConstantBuffer(2, cube.constantsBuffer);
+            efg.BindConstantBuffer(3, cubeMaterialBuffer);
+            efg.DrawIndexedInstanced(cubeShape.indexCount, 1);
+
+            //efg.BindConstantBuffer(2, sphereInstanced.constantsBuffer);
+            //efg.DrawIndexedInstanced(square.indexCount, 2000);
+
+            for (size_t m = 0; m < mesh.materialBatches.size(); m++)
+            {
+                EfgInstanceBatch instances = mesh.materialBatches[m];
+                if(mesh.textures[m].diffuse_map.handle > 0)
+                    efg.Bind2DTexture(6, mesh.textures[m].diffuse_map);
+                efg.BindConstantBuffer(2, mesh.constantsBuffer);
+                efg.BindConstantBuffer(3, mesh.materialBuffers[m]);
+                efg.BindVertexBuffer(instances.vertexBuffer);
+                efg.BindIndexBuffer(instances.indexBuffer);
+                efg.DrawIndexedInstanced(instances.indexCount);
+            }
         }
 
         efg.SetPipelineState(skyboxPso);

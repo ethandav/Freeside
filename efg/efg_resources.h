@@ -79,6 +79,9 @@ struct EfgBuffer
 struct EfgTextureInternal : EfgResource
 {
     DXGI_FORMAT format;
+    bool is3D = false;
+    bool useFaceIndex = false;
+    uint32_t faceIndex = 0;
     D3D12_SHADER_RESOURCE_VIEW_DESC viewDesc = {};
     CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle = {};
     CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle = {};

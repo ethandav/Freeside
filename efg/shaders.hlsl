@@ -62,8 +62,10 @@ StructuredBuffer<LightData> lights : register(t0);
 
 Texture2D diffuseMap: register(t2);
 Texture2D shadowMap: register(t3);
+TextureCube shadowCubeMap : register(t4);
 SamplerState textureSampler : register(s0);
 SamplerComparisonState shadowSampler : register(s1);
+SamplerComparisonState shadowCubeSampler : register(s2);
 
 struct PSInput
 {
@@ -73,7 +75,7 @@ struct PSInput
     float2 uv : TEXCOORD;
 };
 
-float CalculateShadow(float3 fragPos, float3 normal, float3 lightDir) {
+float CalculateDirShadow(float3 fragPos, float3 normal, float3 lightDir) {
     // Transform world position to light space
     float4 lightSpacePos = mul(dirLightViewProj, float4(fragPos, 1.0));
     float3 projCoords = lightSpacePos.xyz / lightSpacePos.w; // Perspective divide
@@ -110,7 +112,7 @@ float3 calculateDirLight(float3 fragPos, float3 normal, float3 viewDir, float2 u
 
     float3 texDiffuse, ambient, diffuse, specular;
 
-    float shadow = CalculateShadow(fragPos, normal, lightDir);
+    float shadow = CalculateDirShadow(fragPos, normal, lightDir);
 
     if(mat.diffuseMapFlag > 0)
         texDiffuse = diffuseMap.Sample(textureSampler, uv).xyz;
@@ -122,6 +124,23 @@ float3 calculateDirLight(float3 fragPos, float3 normal, float3 viewDir, float2 u
     specular = dirLight.specular.xyz * spec * mat.specular.xyz * shadow;
 
     return ambient + diffuse + specular;
+}
+
+float CalcPointLightShadow(float3 fragPos, float3 lightPos)
+{
+    float3 lightToFrag = fragPos - lightPos;
+    float distance = length(lightToFrag);
+    float3 direction = normalize(lightToFrag);
+    float farPlane = 50.0f;
+    float distanceNormalized = distance / farPlane;
+
+    float depthValue = shadowCubeMap.Sample(textureSampler, direction).r;
+    //float depthValue = shadowCubeMap.SampleCmp(shadowCubeSampler, direction, distanceNormalized);
+
+    //depthValue *= farPlane;
+
+    float shadow = distanceNormalized > depthValue ? 1.0 : 0.0;
+    return shadow;
 
 }
 
@@ -142,6 +161,8 @@ float3 calculatePointLight(LightData light, float3 normal, float3 fragPos, float
 
     float3 texDiffuse, ambient, diffuse, specular;
 
+    float shadow = CalcPointLightShadow(fragPos, light.position.xyz);
+
     if(mat.diffuseMapFlag > 0)
     {
         texDiffuse = diffuseMap.Sample(textureSampler, uv).xyz;
@@ -152,14 +173,24 @@ float3 calculatePointLight(LightData light, float3 normal, float3 fragPos, float
     }
 
     ambient = (light.ambient * light.color).xyz * texDiffuse;
-    diffuse = (light.diffuse.xyz * light.color.xyz) * diff * texDiffuse;
-    specular = light.specular.xyz * spec * mat.specular.xyz;
+    diffuse = (light.diffuse.xyz * light.color.xyz) * diff * texDiffuse * (1.0 - shadow);
+    specular = light.specular.xyz * spec * mat.specular.xyz * (1.0 - shadow);
 
     ambient *= attenuation;
     diffuse *= attenuation;
     specular *= attenuation;
 
     return ambient + diffuse + specular;
+}
+
+float3 VisualizeSampledDirection(float3 fragPos, float3 lightPos)
+{
+    float3 lightToFrag = fragPos - lightPos;
+    float3 direction = normalize(lightToFrag);
+
+    // Map direction to color for visualization
+    // This will show which axis (face) is dominant based on color
+    return 0.5 * (direction + 1.0); // Shift and scale to [0, 1] range for visualization
 }
 
 float4 Main(PSInput input) : SV_TARGET
@@ -175,5 +206,7 @@ float4 Main(PSInput input) : SV_TARGET
     {
         color += calculatePointLight(lights[i], normal, input.fragPos, viewDir, input.uv);
     }
+    
+    //return float4(visualizeShadowMapDepth(input.fragPos, lights[0].position.xyz), 1.0f);
     return float4(color, 1.0f);
 }

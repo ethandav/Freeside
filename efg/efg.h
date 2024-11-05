@@ -230,7 +230,9 @@ public:
     EfgTexture CreateTexture2D();
     EfgTexture CreateTexture2DFromFile(const wchar_t* filename);
     EfgTexture CreateTextureCube(const std::vector<std::wstring>& filenames);
+    EfgTexture CreateCubeShadowMap(uint32_t width, uint32_t height);
     EfgSampler CreateTextureSampler();
+    EfgSampler CreateDepthCubeSampler();
     EfgSampler CreateDepthSampler();
     EfgTexture CreateColorBuffer(uint32_t width, uint32_t height);
     void Copy2DTextureToBackbuffer(EfgTexture);
@@ -250,7 +252,7 @@ public:
     EfgPSO CreateGraphicsPipelineState(EfgProgram program, EfgRootSignature& rootSignature);
     EfgPSO CreateShadowMapPSO(EfgProgram program, EfgRootSignature rootSignature);
     void SetPipelineState(EfgPSO pso);
-    void SetRenderTarget(EfgTexture texture, EfgTexture* depthStencil = nullptr);
+    void SetRenderTarget(EfgTexture texture, uint32_t offset = 0, EfgTexture* depthStencil = nullptr);
     void SetRenderTargetResolution(uint32_t width, uint32_t height);
     void DrawInstanced(uint32_t vertexCount);
     void DrawIndexedInstanced(uint32_t indexCount, uint32_t instanceCount = 1);
@@ -316,6 +318,7 @@ private:
     void CreateTextureView(EfgTextureInternal* texture, uint32_t heapOffset);
     void CreateTextureCubeView(EfgTextureInternal* texture, uint32_t heapOffset);
     void CommitSampler(EfgSamplerInternal* sampler, uint32_t heapOffset);
+    void ClearDepthStencilViewCube(EfgTextureInternal* texture);
 
 	HWND window_ = {};
     static const UINT FrameCount = 2;
@@ -344,6 +347,7 @@ private:
     UINT m_rtvDescriptorSize = 0;
     UINT m_cbvSrvDescriptorSize = 0;
     UINT m_samplerDescriptorSize = 0;
+    UINT m_dsvDescriptorSize = 0;
     uint32_t m_cbvDescriptorCount = 0;
     uint32_t m_srvDescriptorCount = 0;
     uint32_t m_dsvDescriptorCount = 0;

@@ -75,6 +75,14 @@ struct PSInput
     float2 uv : TEXCOORD;
 };
 
+static const float3 gridSamplingDisk[20] = {
+    float3(1, 1,  1), float3( 1, -1,  1), float3(-1, -1,  1), float3(-1, 1,  1), 
+    float3(1, 1, -1), float3( 1, -1, -1), float3(-1, -1, -1), float3(-1, 1, -1),
+    float3(1, 1,  0), float3( 1, -1,  0), float3(-1, -1,  0), float3(-1, 1,  0),
+    float3(1, 0,  1), float3(-1,  0,  1), float3( 1,  0, -1), float3(-1, 0, -1),
+    float3(0, 1,  1), float3( 0, -1,  1), float3( 0, -1, -1), float3( 0, 1, -1)
+};
+
 float CalculateDirShadow(float3 fragPos, float3 normal, float3 lightDir) {
     // Transform world position to light space
     float4 lightSpacePos = mul(dirLightViewProj, float4(fragPos, 1.0));
@@ -128,13 +136,22 @@ float3 calculateDirLight(float3 fragPos, float3 normal, float3 viewDir, float2 u
 
 float CalcPointLightShadow(float3 fragPos, float3 lightPos)
 {
-    float3 lightToFrag = fragPos - lightPos;
-    float distance = length(lightToFrag);
-    float3 direction = normalize(lightToFrag);
+    float3 fragToLight = fragPos - lightPos;
+    float currentDepth = length(fragToLight);
+    float shadow = 0.0f;
+    float bias = 0.15;
+    int samples = 20;
     float farPlane = 10.0f;
-    float distanceNormalized = distance / farPlane;
-    float depthValue = shadowCubeMap.Sample(textureSampler, direction).r;
-    float shadow = (distanceNormalized) > depthValue ? 1.0 : 0.0;
+    float viewDistance = length(viewPos - fragPos);
+    float diskRadius = (1.0 + (viewDistance / farPlane)) / 25.0;
+    for (int i = 0; i < samples; ++i)
+    {
+        float closestDepth = shadowCubeMap.Sample(textureSampler, fragToLight + gridSamplingDisk[i] * diskRadius).r;
+        closestDepth *= farPlane;
+        if(currentDepth - bias > closestDepth)
+            shadow += 1.0;
+    }
+    shadow /= float(samples);
     return shadow;
 
 }

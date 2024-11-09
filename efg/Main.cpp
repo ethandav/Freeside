@@ -152,7 +152,7 @@ int main()
         DirectX::XMMatrixLookAtLH(lightPos, lightPos + DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)),  // +Z good
         DirectX::XMMatrixLookAtLH(lightPos, lightPos + DirectX::XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f), DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f))  // -Z good
     };
-    float nearPlane = 4.0f;
+    float nearPlane = 3.0f;
     float farPlane = 10.0f;
     XMMATRIX PL_projMatrix = XMMatrixPerspectiveFovLH(XM_PIDIV2, 1.0f, nearPlane, farPlane);
     std::vector<EfgBuffer> pl_viewProjBuffers = {};
@@ -399,12 +399,6 @@ int main()
                     efg.BindConstantBuffer(2, sphere.constantsBuffer);
                     efg.DrawIndexedInstanced(square.indexCount, 1);
 
-                    efg.BindVertexBuffer(cube.vertexBuffer);
-                    efg.BindIndexBuffer(cube.indexBuffer);
-                    efg.BindConstantBuffer(1, cube.transformBuffer);
-                    efg.BindConstantBuffer(2, cube.constantsBuffer);
-                    efg.DrawIndexedInstanced(cubeShape.indexCount, 1);
-
                     //efg.BindConstantBuffer(2, sphereInstanced.constantsBuffer);
                     //efg.DrawIndexedInstanced(square.indexCount, 2000);
 
@@ -440,14 +434,6 @@ int main()
             efg.BindConstantBuffer(2, sphere.constantsBuffer);
             efg.BindConstantBuffer(3, materialBuffer);
             efg.DrawIndexedInstanced(square.indexCount, 1);
-
-            efg.BindVertexBuffer(cube.vertexBuffer);
-            efg.BindIndexBuffer(cube.indexBuffer);
-            efg.Bind2DTexture(6, texture);
-            efg.BindConstantBuffer(1, cube.transformBuffer);
-            efg.BindConstantBuffer(2, cube.constantsBuffer);
-            efg.BindConstantBuffer(3, cubeMaterialBuffer);
-            efg.DrawIndexedInstanced(cubeShape.indexCount, 1);
 
             //efg.BindConstantBuffer(2, sphereInstanced.constantsBuffer);
             //efg.DrawIndexedInstanced(square.indexCount, 2000);

@@ -131,15 +131,10 @@ float CalcPointLightShadow(float3 fragPos, float3 lightPos)
     float3 lightToFrag = fragPos - lightPos;
     float distance = length(lightToFrag);
     float3 direction = normalize(lightToFrag);
-    float farPlane = 50.0f;
+    float farPlane = 10.0f;
     float distanceNormalized = distance / farPlane;
-
     float depthValue = shadowCubeMap.Sample(textureSampler, direction).r;
-    //float depthValue = shadowCubeMap.SampleCmp(shadowCubeSampler, direction, distanceNormalized);
-
-    //depthValue *= farPlane;
-
-    float shadow = distanceNormalized > depthValue ? 1.0 : 0.0;
+    float shadow = (distanceNormalized) > depthValue ? 1.0 : 0.0;
     return shadow;
 
 }

@@ -134,38 +134,24 @@ float3 calculateDirLight(float3 fragPos, float3 normal, float3 viewDir, float2 u
     return ambient + diffuse + specular;
 }
 
-float LinearizeDepth(float z_ndc, float near, float far)
-{
-    return (near * far) / (far - z_ndc * (far - near));
-}
-
 float CalcPointLightShadow(float3 fragPos, float3 lightPos)
 {
-    //float3 fragToLight = fragPos - lightPos;
-    //float currentDepth = length(fragToLight);
-    //float shadow = 0.0f;
-    //float bias = 0.15;
-    //int samples = 20;
-    //float farPlane = 10.0f;
-    //float viewDistance = length(viewPos - fragPos);
-    //float diskRadius = (1.0 + (viewDistance / farPlane)) / 25.0;
-    //for (int i = 0; i < samples; ++i)
-    //{
-    //    float closestDepth = shadowCubeMap.Sample(textureSampler, fragToLight + gridSamplingDisk[i] * diskRadius).r;
-    //    closestDepth *= farPlane;
-    //    if(currentDepth - bias > closestDepth)
-    //        shadow += 1.0;
-    //}
-    //shadow /= float(samples);
-    //return shadow;
-
     float3 fragToLight = fragPos - lightPos;
-    float closestDepth = shadowCubeMap.Sample(textureSampler, fragToLight).r;
-    closestDepth = LinearizeDepth(closestDepth, 0.1f, 10.0f);
     float currentDepth = length(fragToLight);
-    float bias = 0.5f;
-    float shadow = (currentDepth - bias) >= closestDepth ? 1.0 : 0.0;
-
+    float shadow = 0.0f;
+    float bias = 0.15;
+    int samples = 20;
+    float farPlane = 10.0f;
+    float viewDistance = length(viewPos - fragPos);
+    float diskRadius = (1.0 + (viewDistance / farPlane)) / 25.0;
+    for (int i = 0; i < samples; ++i)
+    {
+        float closestDepth = shadowCubeMap.Sample(textureSampler, fragToLight + gridSamplingDisk[i] * diskRadius).r;
+        closestDepth *= farPlane;
+        if(currentDepth - bias > closestDepth)
+            shadow += 1.0;
+    }
+    shadow /= float(samples);
     return shadow;
 
 }
@@ -226,7 +212,7 @@ float4 Main(PSInput input) : SV_TARGET
     
     float3 color = float3(0.0f, 0.0f, 0.0);
 
-    //color += calculateDirLight(input.fragPos, normal, viewDir, input.uv);
+    color += calculateDirLight(input.fragPos, normal, viewDir, input.uv);
 
     for (uint i = 0; i < numPointlights; ++i)
     {

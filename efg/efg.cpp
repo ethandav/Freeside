@@ -1286,6 +1286,8 @@ EfgPSO EfgContext::CreateShadowMapPSO(EfgProgram program, EfgRootSignature rootS
     psoInternal->desc.RasterizerState.DepthBias = 50;
     psoInternal->desc.RasterizerState.DepthBiasClamp = 0.0f;
     psoInternal->desc.RasterizerState.SlopeScaledDepthBias = 1.0f;
+    psoInternal->desc.RasterizerState.MultisampleEnable = FALSE;
+    psoInternal->desc.RasterizerState.AntialiasedLineEnable = FALSE;
     psoInternal->desc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
     psoInternal->desc.DepthStencilState.DepthEnable = TRUE;
     psoInternal->desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;

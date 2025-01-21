@@ -113,9 +113,9 @@ int main()
     sphere.material.ambient = XMFLOAT4(0.5f, 0.5f, 0.5f, 0.0f);
     sphere.material.specular = XMFLOAT4(0.2f, 0.2f, 0.2f, 0.0f);
     sphere.material.shininess = 32.0f;
-    sphere.material.diffuseMapFlag = true;
+    sphere.material.diffuseMapFlag = false;
     EfgBuffer materialBuffer = efg.CreateConstantBuffer<EfgMaterialBuffer>(&sphere.material, 1);
-    sphere.transform.translation = XMFLOAT3(1.5f, 0.5f, 0.0f);
+    sphere.transform.translation = XMFLOAT3(1.5f, 0.5f, 1.0f);
     sphere.transform.scale = XMFLOAT3(1.0f, 1.0f, 1.0f);
     sphere.transform.rotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
     sphere.constantsBuffer = efg.CreateConstantBuffer<ObjectConstants>(&sphere.constants, 1);
@@ -131,17 +131,63 @@ int main()
     cube.material.ambient = XMFLOAT4(0.5f, 0.5f, 0.5f, 0.0f);
     cube.material.specular = XMFLOAT4(0.2f, 0.2f, 0.2f, 0.0f);
     cube.material.shininess = 32.0f;
-    cube.material.diffuseMapFlag = true;
+    cube.material.diffuseMapFlag = false;
     EfgBuffer cubeMaterialBuffer = efg.CreateConstantBuffer<EfgMaterialBuffer>(&cube.material, 1);
-    cube.transform.translation = XMFLOAT3(0.0f, 5.5f, -2.0f);
+    cube.transform.translation = XMFLOAT3(-1.5f, 0.5f, 1.0f);
     cube.transform.scale = XMFLOAT3(1.0f, 1.0f, 1.0f);
     cube.transform.rotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
     cube.constantsBuffer = efg.CreateConstantBuffer<ObjectConstants>(&cube.constants, 1);
     cube.transformBuffer = efg.CreateConstantBuffer<XMMATRIX>(&cube.transform.GetTransformMatrix(), 1);
 
+    GameObject cube2;
+    cube2.constants.useTransform = true;
+    cube2.vertexBuffer = efg.CreateVertexBuffer<Vertex>(cubeShape.vertices.data(), cubeShape.vertexCount);
+    cube2.indexBuffer = efg.CreateIndexBuffer<uint32_t>(cubeShape.indices.data(), cubeShape.indexCount);
+    cube2.transform.translation = XMFLOAT3(0.0f, 2.5f, 7.0f);
+    cube2.transform.scale = XMFLOAT3(7.0f, 7.0f, 7.0f);
+    cube2.transform.rotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    cube2.constantsBuffer = efg.CreateConstantBuffer<ObjectConstants>(&cube2.constants, 1);
+    cube2.transformBuffer = efg.CreateConstantBuffer<XMMATRIX>(&cube2.transform.GetTransformMatrix(), 1);
+    GameObject cube3;
+    cube3.constants.useTransform = true;
+    cube3.vertexBuffer = efg.CreateVertexBuffer<Vertex>(cubeShape.vertices.data(), cubeShape.vertexCount);
+    cube3.indexBuffer = efg.CreateIndexBuffer<uint32_t>(cubeShape.indices.data(), cubeShape.indexCount);
+    cube3.transform.translation = XMFLOAT3(7.0f, 2.5f, 0.0f);
+    cube3.transform.scale = XMFLOAT3(7.0f, 7.0f, 7.0f);
+    cube3.transform.rotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    cube3.constantsBuffer = efg.CreateConstantBuffer<ObjectConstants>(&cube3.constants, 1);
+    cube3.transformBuffer = efg.CreateConstantBuffer<XMMATRIX>(&cube3.transform.GetTransformMatrix(), 1);
+    GameObject cube4;
+    cube4.constants.useTransform = true;
+    cube4.vertexBuffer = efg.CreateVertexBuffer<Vertex>(cubeShape.vertices.data(), cubeShape.vertexCount);
+    cube4.indexBuffer = efg.CreateIndexBuffer<uint32_t>(cubeShape.indices.data(), cubeShape.indexCount);
+    cube4.transform.translation = XMFLOAT3(-7.0f, 2.5f, 0.0f);
+    cube4.transform.scale = XMFLOAT3(7.0f, 7.0f, 7.0f);
+    cube4.transform.rotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    cube4.constantsBuffer = efg.CreateConstantBuffer<ObjectConstants>(&cube4.constants, 1);
+    cube4.transformBuffer = efg.CreateConstantBuffer<XMMATRIX>(&cube4.transform.GetTransformMatrix(), 1);
+
+    GameObject plane;
+    Shape planeShape = Shapes::getShape(Shapes::PLANE);
+    plane.constants.useTransform = true;
+    plane.vertexBuffer = efg.CreateVertexBuffer<Vertex>(planeShape.vertices.data(), planeShape.vertexCount);
+    plane.indexBuffer = efg.CreateIndexBuffer<uint32_t>(planeShape.indices.data(), planeShape.indexCount);
+    plane.material.ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 0.0f);
+    plane.material.diffuse = XMFLOAT4(0.5f, 0.5f, 0.5f, 0.0f);
+    plane.material.ambient = XMFLOAT4(0.5f, 0.5f, 0.5f, 0.0f);
+    plane.material.specular = XMFLOAT4(0.2f, 0.2f, 0.2f, 0.0f);
+    plane.material.shininess = 32.0f;
+    plane.material.diffuseMapFlag = false;
+    EfgBuffer planeMaterialBuffer = efg.CreateConstantBuffer<EfgMaterialBuffer>(&plane.material, 1);
+    plane.transform.translation = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    plane.transform.scale = XMFLOAT3(1.5f, 1.5f, 1.5f);
+    plane.transform.rotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    plane.constantsBuffer = efg.CreateConstantBuffer<ObjectConstants>(&plane.constants, 1);
+    plane.transformBuffer = efg.CreateConstantBuffer<XMMATRIX>(&plane.transform.GetTransformMatrix(), 1);
+
     std::vector<PointLightBuffer> pointLights(1);
-    pointLights[0].position = XMFLOAT4(0.0f, 5.0f, 0.0f, 0.0f);
-    pointLights[0].color = XMFLOAT4(0.8f, 0.8f, 0.8f, 0.0f);
+    pointLights[0].position = XMFLOAT4(0.0f, 0.5f, 0.0f, 0.0f);
+    pointLights[0].color = XMFLOAT4(1.0f, 0.1f, 0.7f, 0.0f);
     pointLights[0].attenuation = XMFLOAT4(1.0, 0.09, 0.032, 0.0f);
     XMVECTOR lightPos = XMLoadFloat4(&pointLights[0].position);
     DirectX::XMMATRIX PL_shadowViewMatrices[6] = {
@@ -152,7 +198,7 @@ int main()
         DirectX::XMMatrixLookAtLH(lightPos, lightPos + DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)),  // +Z good
         DirectX::XMMatrixLookAtLH(lightPos, lightPos + DirectX::XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f), DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f))  // -Z good
     };
-    float nearPlane = 3.0f;
+    float nearPlane = 0.1f;
     float farPlane = 10.0f;
     XMMATRIX PL_projMatrix = XMMatrixPerspectiveFovLH(XM_PIDIV2, 1.0f, nearPlane, farPlane);
     std::vector<EfgBuffer> pl_viewProjBuffers = {};
@@ -203,15 +249,16 @@ int main()
     EfgBuffer dirLightBuffer = efg.CreateConstantBuffer<DirLightBuffer>(&dirLight, 1);
     EfgBuffer transformMatrixBuffer = efg.CreateStructuredBuffer<XMMATRIX>(transformMatrices.data(), (uint32_t)transformMatrices.size());
 
-    EfgTexture texture = efg.CreateTexture2DFromFile(L"earth.jpeg");
-    EfgTexture texture2 = efg.CreateTexture2DFromFile(L"water.jpg");
+    //EfgTexture texture = efg.CreateTexture2DFromFile(L"earth.jpeg");
+    //EfgTexture texture2 = efg.CreateTexture2DFromFile(L"grass.png");
+    //EfgTexture textureBox = efg.CreateTexture2DFromFile(L"box.jpg");
 
     EfgSampler sampler = efg.CreateTextureSampler();
     EfgSampler depthSampler = efg.CreateDepthSampler();
     EfgSampler depthCubeSampler = efg.CreateDepthCubeSampler();
 
     //EfgImportMesh mesh = efg.LoadFromObj("C:\\Users\\Ethan\\Documents\\sibenik", "C:\\Users\\Ethan\\Documents\\sibenik\\sibenik.obj");
-    EfgImportMesh mesh = efg.LoadFromObj(nullptr, "C:\\Users\\Ethan\\Documents\\FreesideEngineTestAssets\\donut\\donut.obj");
+    //EfgImportMesh mesh = efg.LoadFromObj(nullptr, "C:\\Users\\Ethan\\Documents\\FreesideEngineTestAssets\\donut\\donut.obj");
 
     // Create a Skybox
     Shape skybox = Shapes::getShape(Shapes::SKYBOX);
@@ -371,17 +418,29 @@ int main()
                 efg.BindConstantBuffer(2, sphere.constantsBuffer);
                 efg.DrawIndexedInstanced(square.indexCount, 1);
 
+                efg.BindVertexBuffer(cube.vertexBuffer);
+                efg.BindIndexBuffer(cube.indexBuffer);
+                efg.BindConstantBuffer(1, cube.transformBuffer);
+                efg.BindConstantBuffer(2, cube.constantsBuffer);
+                efg.DrawIndexedInstanced(cubeShape.indexCount, 1);
+
+                efg.BindVertexBuffer(plane.vertexBuffer);
+                efg.BindIndexBuffer(plane.indexBuffer);
+                efg.BindConstantBuffer(1, plane.transformBuffer);
+                efg.BindConstantBuffer(2, plane.constantsBuffer);
+                efg.DrawIndexedInstanced(planeShape.indexCount, 1);
+
                 //efg.BindConstantBuffer(2, sphereInstanced.constantsBuffer);
                 //efg.DrawIndexedInstanced(square.indexCount, 2000);
 
-                for (size_t m = 0; m < mesh.materialBatches.size(); m++)
-                {
-                    EfgInstanceBatch instances = mesh.materialBatches[m];
-                    efg.BindConstantBuffer(2, mesh.constantsBuffer);
-                    efg.BindVertexBuffer(instances.vertexBuffer);
-                    efg.BindIndexBuffer(instances.indexBuffer);
-                    efg.DrawIndexedInstanced(instances.indexCount);
-                }
+                //for (size_t m = 0; m < mesh.materialBatches.size(); m++)
+                //{
+                //    EfgInstanceBatch instances = mesh.materialBatches[m];
+                //    efg.BindConstantBuffer(2, mesh.constantsBuffer);
+                //    efg.BindVertexBuffer(instances.vertexBuffer);
+                //    efg.BindIndexBuffer(instances.indexBuffer);
+                //    efg.DrawIndexedInstanced(instances.indexCount);
+                //}
             }
 
             // Point Light Shadow map
@@ -399,17 +458,14 @@ int main()
                     efg.BindConstantBuffer(2, sphere.constantsBuffer);
                     efg.DrawIndexedInstanced(square.indexCount, 1);
 
+                    efg.BindVertexBuffer(cube.vertexBuffer);
+                    efg.BindIndexBuffer(cube.indexBuffer);
+                    efg.BindConstantBuffer(1, cube.transformBuffer);
+                    efg.BindConstantBuffer(2, cube.constantsBuffer);
+                    efg.DrawIndexedInstanced(cubeShape.indexCount, 1);
+
                     //efg.BindConstantBuffer(2, sphereInstanced.constantsBuffer);
                     //efg.DrawIndexedInstanced(square.indexCount, 2000);
-
-                    for (size_t m = 0; m < mesh.materialBatches.size(); m++)
-                    {
-                        EfgInstanceBatch instances = mesh.materialBatches[m];
-                        efg.BindConstantBuffer(2, mesh.constantsBuffer);
-                        efg.BindVertexBuffer(instances.vertexBuffer);
-                        efg.BindIndexBuffer(instances.indexBuffer);
-                        efg.DrawIndexedInstanced(instances.indexCount);
-                    }
                 }
             }
         }
@@ -429,33 +485,67 @@ int main()
 
             efg.BindVertexBuffer(sphere.vertexBuffer);
             efg.BindIndexBuffer(sphere.indexBuffer);
-            efg.Bind2DTexture(6, texture);
+            //efg.Bind2DTexture(6, texture);
             efg.BindConstantBuffer(1, sphere.transformBuffer);
             efg.BindConstantBuffer(2, sphere.constantsBuffer);
             efg.BindConstantBuffer(3, materialBuffer);
             efg.DrawIndexedInstanced(square.indexCount, 1);
 
+            efg.BindVertexBuffer(cube.vertexBuffer);
+            efg.BindIndexBuffer(cube.indexBuffer);
+            //efg.Bind2DTexture(6, textureBox);
+            efg.BindConstantBuffer(1, cube.transformBuffer);
+            efg.BindConstantBuffer(2, cube.constantsBuffer);
+            efg.BindConstantBuffer(3, cubeMaterialBuffer);
+            efg.DrawIndexedInstanced(cubeShape.indexCount, 1);
+
+            efg.BindVertexBuffer(plane.vertexBuffer);
+            efg.BindIndexBuffer(plane.indexBuffer);
+            //efg.Bind2DTexture(6, texture2);
+            efg.BindConstantBuffer(1, plane.transformBuffer);
+            efg.BindConstantBuffer(2, plane.constantsBuffer);
+            efg.BindConstantBuffer(3, planeMaterialBuffer);
+            efg.DrawIndexedInstanced(planeShape.indexCount, 1);
+
+            efg.BindVertexBuffer(cube2.vertexBuffer);
+            efg.BindIndexBuffer(cube2.indexBuffer);
+            efg.BindConstantBuffer(1, cube2.transformBuffer);
+            efg.BindConstantBuffer(2, cube2.constantsBuffer);
+            efg.DrawIndexedInstanced(cubeShape.indexCount, 1);
+
+            efg.BindVertexBuffer(cube3.vertexBuffer);
+            efg.BindIndexBuffer(cube3.indexBuffer);
+            efg.BindConstantBuffer(1, cube3.transformBuffer);
+            efg.BindConstantBuffer(2, cube3.constantsBuffer);
+            efg.DrawIndexedInstanced(cubeShape.indexCount, 1);
+
+            efg.BindVertexBuffer(cube4.vertexBuffer);
+            efg.BindIndexBuffer(cube4.indexBuffer);
+            efg.BindConstantBuffer(1, cube4.transformBuffer);
+            efg.BindConstantBuffer(2, cube4.constantsBuffer);
+            efg.DrawIndexedInstanced(cubeShape.indexCount, 1);
+
             //efg.BindConstantBuffer(2, sphereInstanced.constantsBuffer);
             //efg.DrawIndexedInstanced(square.indexCount, 2000);
 
-            for (size_t m = 0; m < mesh.materialBatches.size(); m++)
-            {
-                EfgInstanceBatch instances = mesh.materialBatches[m];
-                if(mesh.textures[m].diffuse_map.handle > 0)
-                    efg.Bind2DTexture(6, mesh.textures[m].diffuse_map);
-                efg.BindConstantBuffer(2, mesh.constantsBuffer);
-                efg.BindConstantBuffer(3, mesh.materialBuffers[m]);
-                efg.BindVertexBuffer(instances.vertexBuffer);
-                efg.BindIndexBuffer(instances.indexBuffer);
-                efg.DrawIndexedInstanced(instances.indexCount);
-            }
+            //for (size_t m = 0; m < mesh.materialBatches.size(); m++)
+            //{
+            //    EfgInstanceBatch instances = mesh.materialBatches[m];
+            //    if(mesh.textures[m].diffuse_map.handle > 0)
+            //        efg.Bind2DTexture(6, mesh.textures[m].diffuse_map);
+            //    efg.BindConstantBuffer(2, mesh.constantsBuffer);
+            //    efg.BindConstantBuffer(3, mesh.materialBuffers[m]);
+            //    efg.BindVertexBuffer(instances.vertexBuffer);
+            //    efg.BindIndexBuffer(instances.indexBuffer);
+            //    efg.DrawIndexedInstanced(instances.indexCount);
+            //}
         }
 
-        efg.SetPipelineState(skyboxPso);
-        efg.BindRootDescriptorTable(skybox_rootSignature);
-        efg.BindVertexBuffer(skyboxVertexBuffer);
-        efg.BindIndexBuffer(skyboxIndexBuffer);
-        efg.DrawIndexedInstanced(skybox.indexCount);
+        //efg.SetPipelineState(skyboxPso);
+        //efg.BindRootDescriptorTable(skybox_rootSignature);
+        //efg.BindVertexBuffer(skyboxVertexBuffer);
+        //efg.BindIndexBuffer(skyboxIndexBuffer);
+        //efg.DrawIndexedInstanced(skybox.indexCount);
 
         efg.Copy2DTextureToBackbuffer(colorBuffer);
 
